@@ -1,6 +1,7 @@
 #include "../../Common/d3dApp.h"
 #include "../../Common/MathHelper.h"
 #include "../../Common/UploadBuffer.h"
+#include "../../Common/GameTimer.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
