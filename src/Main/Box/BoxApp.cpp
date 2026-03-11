@@ -2,12 +2,21 @@
 #include "../../Common/MathHelper.h"
 #include "../../Common/GameTimer.h"
 #include "../../Common/d3dUtil.h"
-#include "BoxObject.h"
+#include "../../Common/Camera.h"
+#include "../../Common/tiny_obj_loader.h"
 #include <vector>
 #include <memory>
+#include <string>
+#include <fstream>
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
+
+struct ObjVertex
+{
+    XMFLOAT3 Pos;
+    XMFLOAT3 Normal;
+};
 
 class BoxApp : public D3DApp
 {
@@ -26,22 +35,21 @@ private:
     virtual void OnMouseDown(WPARAM btnState, int x, int y)override;
     virtual void OnMouseUp(WPARAM btnState, int x, int y)override;
     virtual void OnMouseMove(WPARAM btnState, int x, int y)override;
+    virtual void OnKeyDown(WPARAM keyState, int x, int y)override;
+    virtual void OnKeyUp(WPARAM keyState, int x, int y)override;
 
     void BuildDescriptorHeaps();
     void BuildConstantBuffers();
     void BuildRootSignature();
     void BuildShadersAndInputLayout();
     void BuildPSO();
-    void BuildObjects();
+    void LoadModel();
 
 private:
-
     ComPtr<ID3D12RootSignature> mRootSignature = nullptr;
     ComPtr<ID3D12DescriptorHeap> mCbvHeap = nullptr;
 
     std::unique_ptr<UploadBuffer<ObjectConstants>> mObjectCB = nullptr;
-
-    std::vector<std::unique_ptr<BoxObject>> mBoxes;
 
     ComPtr<ID3DBlob> mvsByteCode = nullptr;
     ComPtr<ID3DBlob> mpsByteCode = nullptr;
@@ -50,15 +58,16 @@ private:
 
     ComPtr<ID3D12PipelineState> mPSO = nullptr;
 
-    XMFLOAT4X4 mWorld = MathHelper::Identity4x4();
-    XMFLOAT4X4 mView = MathHelper::Identity4x4();
     XMFLOAT4X4 mProj = MathHelper::Identity4x4();
 
-    float mTheta = 1.5f * XM_PI;
-    float mPhi = XM_PIDIV4;
-    float mRadius = 5.0f;
+    std::unique_ptr<Camera> mCamera = nullptr;
+
+    bool mKeys[256];
 
     POINT mLastMousePos;
+
+    std::unique_ptr<MeshGeometry> mModelGeo = nullptr;
+    UINT mIndexCount = 0;
 };
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance,
@@ -86,6 +95,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance,
 BoxApp::BoxApp(HINSTANCE hInstance)
     : D3DApp(hInstance)
 {
+    mCamera = std::make_unique<Camera>();
+    mCamera->SetPosition(0.0f, 5.0f, -20.0f);
+    mCamera->SetSpeed(200.0f);
+    mCamera->SetSensitivity(0.2f);
+    ZeroMemory(mKeys, sizeof(mKeys));
 }
 
 BoxApp::~BoxApp()
@@ -104,7 +118,7 @@ bool BoxApp::Initialize()
     BuildRootSignature();
     BuildShadersAndInputLayout();
     BuildPSO();
-    BuildObjects();
+    LoadModel();
 
     ThrowIfFailed(mCommandList->Close());
     ID3D12CommandList* cmdsLists[] = { mCommandList.Get() };
@@ -115,64 +129,157 @@ bool BoxApp::Initialize()
     return true;
 }
 
-void BoxApp::BuildObjects()
+void BoxApp::LoadModel()
 {
-    const int numBoxes = 5;
-    float spacing = 3.0f;
+    tinyobj::attrib_t attrib;
+    std::vector<tinyobj::shape_t> shapes;
+    std::vector<tinyobj::material_t> materials;
+    std::string warn, err;
 
-    for (int i = 0; i < numBoxes; ++i)
-    {
-        auto box = std::make_unique<BoxObject>("Box" + std::to_string(i));
+    char exePath[MAX_PATH];
+    GetModuleFileNameA(nullptr, exePath, MAX_PATH);
+    char* lastSlash = strrchr(exePath, '\\');
+    if (lastSlash) *lastSlash = 0;
 
-        float x = (i - 2.0f) * spacing;
-        box->SetPosition(x, 0.0f, 0.0f);
-        box->SetRotation(0.0f, 0.0f, 0.0f);
-        box->SetScale(1.0f, 1.0f, 1.0f);
+    std::string objPath = std::string(exePath) + "\\models\\sponza.obj";
+    std::string mtlPath = std::string(exePath) + "\\models";
 
-        box->SetCBIndex(i);
-        box->Initialize(md3dDevice.Get(), mCommandList.Get());
+    bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err,
+        objPath.c_str(), mtlPath.c_str(), true);
 
-        mBoxes.push_back(std::move(box));
+    if (!warn.empty()) {
+        OutputDebugStringA(warn.c_str());
     }
+
+    if (!err.empty()) {
+        OutputDebugStringA(err.c_str());
+    }
+
+    if (!ret) {
+        MessageBoxA(nullptr, "Failed to load OBJ file", "Error", MB_OK);
+        return;
+    }
+
+    std::vector<ObjVertex> vertices;
+    std::vector<uint32_t> indices;
+
+    for (size_t s = 0; s < shapes.size(); s++) {
+        size_t index_offset = 0;
+
+        for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
+            int fv = shapes[s].mesh.num_face_vertices[f];
+
+            for (size_t v = 0; v < fv; v++) {
+                tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
+
+                float vx = attrib.vertices[3 * idx.vertex_index + 0];
+                float vy = attrib.vertices[3 * idx.vertex_index + 1];
+                float vz = attrib.vertices[3 * idx.vertex_index + 2];
+
+                float nx = 0.0f, ny = 0.0f, nz = 0.0f;
+                if (idx.normal_index >= 0) {
+                    nx = attrib.normals[3 * idx.normal_index + 0];
+                    ny = attrib.normals[3 * idx.normal_index + 1];
+                    nz = attrib.normals[3 * idx.normal_index + 2];
+                }
+
+                ObjVertex vertex;
+                vertex.Pos = XMFLOAT3(vx, vy, vz);
+                vertex.Normal = XMFLOAT3(nx, ny, nz);
+
+                vertices.push_back(vertex);
+                indices.push_back(static_cast<uint32_t>(vertices.size() - 1));
+            }
+            index_offset += fv;
+        }
+    }
+
+    if (vertices.empty()) {
+        MessageBoxA(nullptr, "Model has no vertices!", "Error", MB_OK);
+        return;
+    }
+
+    mIndexCount = static_cast<UINT>(indices.size());
+
+    const UINT vbByteSize = static_cast<UINT>(vertices.size()) * sizeof(ObjVertex);
+    const UINT ibByteSize = static_cast<UINT>(indices.size()) * sizeof(uint32_t);
+
+    mModelGeo = std::make_unique<MeshGeometry>();
+    mModelGeo->Name = "sponza";
+
+    ThrowIfFailed(D3DCreateBlob(vbByteSize, &mModelGeo->VertexBufferCPU));
+    CopyMemory(mModelGeo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
+
+    ThrowIfFailed(D3DCreateBlob(ibByteSize, &mModelGeo->IndexBufferCPU));
+    CopyMemory(mModelGeo->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
+
+    mModelGeo->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(md3dDevice.Get(),
+        mCommandList.Get(), vertices.data(), vbByteSize, mModelGeo->VertexBufferUploader);
+
+    mModelGeo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(md3dDevice.Get(),
+        mCommandList.Get(), indices.data(), ibByteSize, mModelGeo->IndexBufferUploader);
+
+    mModelGeo->VertexByteStride = sizeof(ObjVertex);
+    mModelGeo->VertexBufferByteSize = vbByteSize;
+    mModelGeo->IndexFormat = DXGI_FORMAT_R32_UINT;
+    mModelGeo->IndexBufferByteSize = ibByteSize;
+
+    SubmeshGeometry submesh;
+    submesh.IndexCount = mIndexCount;
+    submesh.StartIndexLocation = 0;
+    submesh.BaseVertexLocation = 0;
+
+    mModelGeo->DrawArgs["sponza"] = submesh;
 }
 
 void BoxApp::OnResize()
 {
     D3DApp::OnResize();
-
-    XMMATRIX P = XMMatrixPerspectiveFovLH(0.25f * MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
-    XMStoreFloat4x4(&mProj, P);
+    mCamera->SetLens(0.25f * MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
 }
 
 void BoxApp::Update(const GameTimer& gt)
 {
-    float x = mRadius * sinf(mPhi) * cosf(mTheta);
-    float z = mRadius * sinf(mPhi) * sinf(mTheta);
-    float y = mRadius * cosf(mPhi);
+    float dt = gt.DeltaTime();
 
-    XMVECTOR pos = XMVectorSet(x, y, z, 1.0f);
-    XMVECTOR target = XMVectorZero();
-    XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+    float speed = mCamera->GetSpeed() * dt;
 
-    XMMATRIX view = XMMatrixLookAtLH(pos, target, up);
-    XMStoreFloat4x4(&mView, view);
-
-    for (auto& box : mBoxes)
+    if (mKeys['W'] || mKeys['w'])
     {
-        box->Update(gt);
+        mCamera->Walk(speed);
+    }
+    if (mKeys['S'] || mKeys['s'])
+    {
+        mCamera->Walk(-speed);
+    }
+    if (mKeys['A'] || mKeys['a'])
+    {
+        mCamera->Strafe(-speed);
+    }
+    if (mKeys['D'] || mKeys['d'])
+    {
+        mCamera->Strafe(speed);
+    }
+    if (mKeys['Q'] || mKeys['q'])
+    {
+        mCamera->Fly(-speed);
+    }
+    if (mKeys['E'] || mKeys['e'])
+    {
+        mCamera->Fly(speed);
     }
 
-    XMMATRIX proj = XMLoadFloat4x4(&mProj);
+    mCamera->UpdateViewMatrix();
 
-    for (size_t i = 0; i < mBoxes.size(); ++i)
-    {
-        XMMATRIX world = mBoxes[i]->GetWorldMatrix();
-        XMMATRIX worldViewProj = world * XMLoadFloat4x4(&mView) * proj;
+    XMMATRIX view = mCamera->GetView();
+    XMMATRIX proj = mCamera->GetProj();
 
-        ObjectConstants objConstants;
-        XMStoreFloat4x4(&objConstants.WorldViewProj, XMMatrixTranspose(worldViewProj));
-        mObjectCB->CopyData((int)i, objConstants);
-    }
+    XMMATRIX world = XMMatrixIdentity();
+    XMMATRIX worldViewProj = world * view * proj;
+
+    ObjectConstants objConstants;
+    XMStoreFloat4x4(&objConstants.WorldViewProj, XMMatrixTranspose(worldViewProj));
+    mObjectCB->CopyData(0, objConstants);
 }
 
 void BoxApp::Draw(const GameTimer& gt)
@@ -195,9 +302,16 @@ void BoxApp::Draw(const GameTimer& gt)
     mCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
     mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
 
-    for (auto& box : mBoxes)
+    D3D12_GPU_DESCRIPTOR_HANDLE cbvHandle = mCbvHeap->GetGPUDescriptorHandleForHeapStart();
+    mCommandList->SetGraphicsRootDescriptorTable(0, cbvHandle);
+
+    if (mModelGeo)
     {
-        box->Draw(mCommandList.Get(), mCbvHeap.Get());
+        mCommandList->IASetVertexBuffers(0, 1, &mModelGeo->VertexBufferView());
+        mCommandList->IASetIndexBuffer(&mModelGeo->IndexBufferView());
+        mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+        mCommandList->DrawIndexedInstanced(mModelGeo->DrawArgs["sponza"].IndexCount, 1, 0, 0, 0);
     }
 
     mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
@@ -229,30 +343,31 @@ void BoxApp::OnMouseMove(WPARAM btnState, int x, int y)
 {
     if ((btnState & MK_LBUTTON) != 0)
     {
-        float dx = XMConvertToRadians(0.25f * static_cast<float>(x - mLastMousePos.x));
-        float dy = XMConvertToRadians(0.25f * static_cast<float>(y - mLastMousePos.y));
+        float dx = XMConvertToRadians(mCamera->GetSensitivity() * static_cast<float>(x - mLastMousePos.x));
+        float dy = XMConvertToRadians(mCamera->GetSensitivity() * static_cast<float>(y - mLastMousePos.y));
 
-        mTheta += dx;
-        mPhi += dy;
-        mPhi = MathHelper::Clamp(mPhi, 0.1f, MathHelper::Pi - 0.1f);
-    }
-    else if ((btnState & MK_RBUTTON) != 0)
-    {
-        float dx = 0.005f * static_cast<float>(x - mLastMousePos.x);
-        float dy = 0.005f * static_cast<float>(y - mLastMousePos.y);
-
-        mRadius += dx - dy;
-        mRadius = MathHelper::Clamp(mRadius, 3.0f, 15.0f);
+        mCamera->RotateY(dx);
+        mCamera->Pitch(dy);
     }
 
     mLastMousePos.x = x;
     mLastMousePos.y = y;
 }
 
+void BoxApp::OnKeyDown(WPARAM keyState, int x, int y)
+{
+    mKeys[keyState] = true;
+}
+
+void BoxApp::OnKeyUp(WPARAM keyState, int x, int y)
+{
+    mKeys[keyState] = false;
+}
+
 void BoxApp::BuildDescriptorHeaps()
 {
     D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc;
-    cbvHeapDesc.NumDescriptors = 5;
+    cbvHeapDesc.NumDescriptors = 1;
     cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
     cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
     cbvHeapDesc.NodeMask = 0;
@@ -262,7 +377,7 @@ void BoxApp::BuildDescriptorHeaps()
 
 void BoxApp::BuildConstantBuffers()
 {
-    UINT numObjects = 5;
+    UINT numObjects = 1;
     mObjectCB = std::make_unique<UploadBuffer<ObjectConstants>>(md3dDevice.Get(), numObjects, true);
 
     UINT objCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
@@ -310,15 +425,13 @@ void BoxApp::BuildRootSignature()
 
 void BoxApp::BuildShadersAndInputLayout()
 {
-    HRESULT hr = S_OK;
-
     mvsByteCode = d3dUtil::CompileShader(L"Shaders\\color.hlsl", nullptr, "VS", "vs_5_0");
     mpsByteCode = d3dUtil::CompileShader(L"Shaders\\color.hlsl", nullptr, "PS", "ps_5_0");
 
     mInputLayout =
     {
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+        { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
     };
 }
 
