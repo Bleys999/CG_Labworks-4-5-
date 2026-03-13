@@ -3,6 +3,8 @@
 
 #include "d3dUtil.h"
 #include "MathHelper.h"
+#include "GameTimer.h"
+#include "Input.h"
 
 class Camera
 {
@@ -55,6 +57,10 @@ public:
     void SetSensitivity(float sensitivity) { mMouseSensitivity = sensitivity; }
     float GetSensitivity() const { return mMouseSensitivity; }
 
+    void HandleInput(const GameTimer& gt, const Input& input);
+    void SetLastMousePos(int x, int y) { mLastMousePos.x = x; mLastMousePos.y = y; }
+    POINT GetLastMousePos() const { return mLastMousePos; }
+
 private:
     DirectX::XMFLOAT3 mPosition = { 0.0f, 0.0f, 0.0f };
     DirectX::XMFLOAT3 mRight = { 1.0f, 0.0f, 0.0f };
@@ -73,11 +79,13 @@ private:
     DirectX::XMFLOAT4X4 mView;
     DirectX::XMFLOAT4X4 mProj;
 
-    float mMoveSpeed = 10.0f;
-    float mMouseSensitivity = 0.1f;
+    float mMoveSpeed = 50.0f;
+    float mMouseSensitivity = 0.2f;
 
     float mPitch = 0.0f;
     float mYaw = 0.0f;
+
+    POINT mLastMousePos = { 0, 0 };
 };
 
 #endif

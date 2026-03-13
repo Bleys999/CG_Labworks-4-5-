@@ -2,17 +2,15 @@
 
 using namespace DirectX;
 
-std::shared_ptr<MeshGeometry> BoxObject::sSharedBoxGeo = nullptr;
-
 const std::array<Vertex, 8> BoxObject::sVertices = { {
-    { XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT4(Colors::White) },
-    { XMFLOAT3(-1.0f, +1.0f, -1.0f), XMFLOAT4(Colors::Black) },
-    { XMFLOAT3(+1.0f, +1.0f, -1.0f), XMFLOAT4(Colors::Red) },
-    { XMFLOAT3(+1.0f, -1.0f, -1.0f), XMFLOAT4(Colors::Green) },
-    { XMFLOAT3(-1.0f, -1.0f, +1.0f), XMFLOAT4(Colors::Blue) },
-    { XMFLOAT3(-1.0f, +1.0f, +1.0f), XMFLOAT4(Colors::Yellow) },
-    { XMFLOAT3(+1.0f, +1.0f, +1.0f), XMFLOAT4(Colors::Cyan) },
-    { XMFLOAT3(+1.0f, -1.0f, +1.0f), XMFLOAT4(Colors::Magenta) }
+    { XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT4(0.7f, 0.7f, 0.7f, 1.0f) },
+    { XMFLOAT3(-1.0f, +1.0f, -1.0f), XMFLOAT4(0.7f, 0.7f, 0.7f, 1.0f) },
+    { XMFLOAT3(+1.0f, +1.0f, -1.0f), XMFLOAT4(0.7f, 0.7f, 0.7f, 1.0f) },
+    { XMFLOAT3(+1.0f, -1.0f, -1.0f), XMFLOAT4(0.7f, 0.7f, 0.7f, 1.0f) },
+    { XMFLOAT3(-1.0f, -1.0f, +1.0f), XMFLOAT4(0.7f, 0.7f, 0.7f, 1.0f) },
+    { XMFLOAT3(-1.0f, +1.0f, +1.0f), XMFLOAT4(0.7f, 0.7f, 0.7f, 1.0f) },
+    { XMFLOAT3(+1.0f, +1.0f, +1.0f), XMFLOAT4(0.7f, 0.7f, 0.7f, 1.0f) },
+    { XMFLOAT3(+1.0f, -1.0f, +1.0f), XMFLOAT4(0.7f, 0.7f, 0.7f, 1.0f) }
 } };
 
 const std::array<std::uint16_t, 36> BoxObject::sIndices = { {
@@ -34,11 +32,10 @@ BoxObject::BoxObject(const std::string& name) : GameObject(name)
 
 bool BoxObject::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList)
 {
-    if (!sSharedBoxGeo)
-    {
-        sSharedBoxGeo = CreateBoxGeometry(device, cmdList);
-    }
-    mGeometry = sSharedBoxGeo;
+    if (!CreateGeometry(device, cmdList))
+        return false;
+
+    mObjectCB = std::make_unique<UploadBuffer<ObjectConstants>>(device, 1, true);
     return true;
 }
 
@@ -46,60 +43,63 @@ void BoxObject::Update(const GameTimer& gt)
 {
 }
 
-void BoxObject::Draw(ID3D12GraphicsCommandList* cmdList, ID3D12DescriptorHeap* cbvHeap)
+void BoxObject::UpdateConstantBuffer(DirectX::FXMMATRIX view, DirectX::FXMMATRIX proj)
 {
-    if (!mGeometry || !mVisible) return;
+    if (!mVisible) return;
 
-    ID3D12Device* device = nullptr;
-    cmdList->GetDevice(IID_PPV_ARGS(&device));
-    UINT descriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-    device->Release();
+    XMMATRIX world = GetWorldMatrix();
+    XMMATRIX worldViewProj = world * view * proj;
 
-    D3D12_GPU_DESCRIPTOR_HANDLE cbvHandle = cbvHeap->GetGPUDescriptorHandleForHeapStart();
-    cbvHandle.ptr += mCBIndex * descriptorSize;
+    ObjectConstants objConstants;
+    XMStoreFloat4x4(&objConstants.WorldViewProj, XMMatrixTranspose(worldViewProj));
 
-    cmdList->SetGraphicsRootDescriptorTable(0, cbvHandle);
+    mObjectCB->CopyData(0, objConstants);
+}
+
+void BoxObject::Draw(ID3D12GraphicsCommandList* cmdList)
+{
+    if (!mGeometry || !mVisible || !mObjectCB) return;
+
+    cmdList->SetGraphicsRootConstantBufferView(0, mObjectCB->Resource()->GetGPUVirtualAddress());
 
     cmdList->IASetVertexBuffers(0, 1, &mGeometry->VertexBufferView());
     cmdList->IASetIndexBuffer(&mGeometry->IndexBufferView());
     cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-    cmdList->DrawIndexedInstanced(
-        mGeometry->DrawArgs["box"].IndexCount,
-        1, 0, 0, 0);
+    cmdList->DrawIndexedInstanced(mGeometry->DrawArgs["box"].IndexCount, 1, 0, 0, 0);
 }
 
-std::shared_ptr<MeshGeometry> BoxObject::CreateBoxGeometry(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList)
+bool BoxObject::CreateGeometry(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList)
 {
-    auto geometry = std::make_shared<MeshGeometry>();
-    geometry->Name = "boxGeo";
+    mGeometry = std::make_unique<MeshGeometry>();
+    mGeometry->Name = "boxGeo";
 
     const UINT vbByteSize = (UINT)sVertices.size() * sizeof(Vertex);
     const UINT ibByteSize = (UINT)sIndices.size() * sizeof(std::uint16_t);
 
-    ThrowIfFailed(D3DCreateBlob(vbByteSize, &geometry->VertexBufferCPU));
-    CopyMemory(geometry->VertexBufferCPU->GetBufferPointer(), sVertices.data(), vbByteSize);
+    ThrowIfFailed(D3DCreateBlob(vbByteSize, &mGeometry->VertexBufferCPU));
+    CopyMemory(mGeometry->VertexBufferCPU->GetBufferPointer(), sVertices.data(), vbByteSize);
 
-    ThrowIfFailed(D3DCreateBlob(ibByteSize, &geometry->IndexBufferCPU));
-    CopyMemory(geometry->IndexBufferCPU->GetBufferPointer(), sIndices.data(), ibByteSize);
+    ThrowIfFailed(D3DCreateBlob(ibByteSize, &mGeometry->IndexBufferCPU));
+    CopyMemory(mGeometry->IndexBufferCPU->GetBufferPointer(), sIndices.data(), ibByteSize);
 
-    geometry->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(device,
-        cmdList, sVertices.data(), vbByteSize, geometry->VertexBufferUploader);
+    mGeometry->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(device,
+        cmdList, sVertices.data(), vbByteSize, mGeometry->VertexBufferUploader);
 
-    geometry->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(device,
-        cmdList, sIndices.data(), ibByteSize, geometry->IndexBufferUploader);
+    mGeometry->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(device,
+        cmdList, sIndices.data(), ibByteSize, mGeometry->IndexBufferUploader);
 
-    geometry->VertexByteStride = sizeof(Vertex);
-    geometry->VertexBufferByteSize = vbByteSize;
-    geometry->IndexFormat = DXGI_FORMAT_R16_UINT;
-    geometry->IndexBufferByteSize = ibByteSize;
+    mGeometry->VertexByteStride = sizeof(Vertex);
+    mGeometry->VertexBufferByteSize = vbByteSize;
+    mGeometry->IndexFormat = DXGI_FORMAT_R16_UINT;
+    mGeometry->IndexBufferByteSize = ibByteSize;
 
     SubmeshGeometry submesh;
     submesh.IndexCount = (UINT)sIndices.size();
     submesh.StartIndexLocation = 0;
     submesh.BaseVertexLocation = 0;
 
-    geometry->DrawArgs["box"] = submesh;
+    mGeometry->DrawArgs["box"] = submesh;
 
-    return geometry;
+    return true;
 }

@@ -8,7 +8,7 @@ Camera::Camera()
     mView = MathHelper::Identity4x4();
     mProj = MathHelper::Identity4x4();
     SetLens(0.25f * MathHelper::Pi, 1.0f, 1.0f, 1000.0f);
-    mPosition = XMFLOAT3(0.0f, 2.0f, -5.0f);
+    mPosition = XMFLOAT3(0.0f, 5.0f, -20.0f);
     mYaw = 0.0f;
     mPitch = 0.0f;
     UpdateViewMatrix();
@@ -263,4 +263,28 @@ void Camera::UpdateViewMatrix()
 
         mViewDirty = false;
     }
+}
+
+void Camera::HandleInput(const GameTimer& gt, const Input& input)
+{
+    float dt = gt.DeltaTime();
+    float speed = mMoveSpeed * dt;
+
+    if (input.IsKeyDown('W') || input.IsKeyDown('w')) Walk(speed);
+    if (input.IsKeyDown('S') || input.IsKeyDown('s')) Walk(-speed);
+    if (input.IsKeyDown('A') || input.IsKeyDown('a')) Strafe(-speed);
+    if (input.IsKeyDown('D') || input.IsKeyDown('d')) Strafe(speed);
+    if (input.IsKeyDown('Q') || input.IsKeyDown('q')) Fly(-speed);
+    if (input.IsKeyDown('E') || input.IsKeyDown('e')) Fly(speed);
+
+    if (input.IsMouseButtonDown())
+    {
+        float dx = XMConvertToRadians(mMouseSensitivity * input.GetMouseDeltaX());
+        float dy = XMConvertToRadians(mMouseSensitivity * input.GetMouseDeltaY());
+
+        RotateY(dx);
+        Pitch(dy);
+    }
+
+    UpdateViewMatrix();
 }

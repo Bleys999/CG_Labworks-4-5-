@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../../Common/d3dUtil.h"
-#include "../../Common/GameTimer.h"
+#include "d3dUtil.h"
+#include "GameTimer.h"
 #include <string>
 
 class GameObject
@@ -11,9 +11,10 @@ public:
     explicit GameObject(const std::string& name) : mName(name) {}
     virtual ~GameObject() = default;
 
-    virtual void Update(const GameTimer& gt) {}
-    virtual void Draw(ID3D12GraphicsCommandList* cmdList, ID3D12DescriptorHeap* cbvHeap) {}
-    virtual bool Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList) { return true; }
+    virtual void Update(const GameTimer& gt) = 0;
+    virtual void Draw(ID3D12GraphicsCommandList* cmdList) = 0;
+    virtual bool Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList) = 0;
+    virtual void UpdateConstantBuffer(DirectX::FXMMATRIX view, DirectX::FXMMATRIX proj) = 0;
 
     void SetPosition(float x, float y, float z) { mPosition = DirectX::XMFLOAT3(x, y, z); }
     void SetPosition(const DirectX::XMFLOAT3& pos) { mPosition = pos; }
@@ -33,9 +34,7 @@ public:
     void SetVisible(bool visible) { mVisible = visible; }
     bool IsVisible() const { return mVisible; }
 
-    void SetCBIndex(int index) { mCBIndex = index; }
-    int GetCBIndex() const { return mCBIndex; }
-
+protected:
     DirectX::XMMATRIX GetWorldMatrix() const
     {
         DirectX::XMMATRIX translation = DirectX::XMMatrixTranslation(mPosition.x, mPosition.y, mPosition.z);
@@ -50,5 +49,4 @@ protected:
     DirectX::XMFLOAT3 mScale = { 1.0f, 1.0f, 1.0f };
     std::string mName;
     bool mVisible = true;
-    int mCBIndex = -1;
 };
