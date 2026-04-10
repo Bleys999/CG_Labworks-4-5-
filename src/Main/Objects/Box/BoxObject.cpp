@@ -50,8 +50,11 @@ void BoxObject::UpdateConstantBuffer(DirectX::FXMMATRIX view, DirectX::FXMMATRIX
     XMMATRIX world = GetWorldMatrix();
     XMMATRIX worldViewProj = world * view * proj;
 
-    ObjectConstants objConstants;
+    ObjectConstants objConstants{};
     XMStoreFloat4x4(&objConstants.WorldViewProj, XMMatrixTranspose(worldViewProj));
+    objConstants.DiffuseFactor = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+    objConstants.UVScale = XMFLOAT2(1.0f, 1.0f);
+    objConstants.UVOffset = XMFLOAT2(0.0f, 0.0f);
 
     mObjectCB->CopyData(0, objConstants);
 }

@@ -1,0 +1,138 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Shader Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD02}</UniqueIdentifier>
+      <Extensions>hlsl</Extensions>
+    </Filter>
+    <Filter Include="Common\Core">
+      <UniqueIdentifier>{a1b2c3d4-0001-0000-0000-000000000001}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Common\D3D12">
+      <UniqueIdentifier>{a1b2c3d4-0002-0000-0000-000000000001}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Common\Scene">
+      <UniqueIdentifier>{a1b2c3d4-0003-0000-0000-000000000001}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Common\Assets">
+      <UniqueIdentifier>{a1b2c3d4-0004-0000-0000-000000000001}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Main\Objects\Sponza">
+      <UniqueIdentifier>{a1b2c3d4-0005-0000-0000-000000000001}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Main\Objects\Box">
+      <UniqueIdentifier>{a1b2c3d4-0006-0000-0000-000000000001}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="MainApp.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Objects\Box\BoxObject.cpp">
+      <Filter>Main\Objects\Box</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Common\Core\d3dApp.cpp">
+      <Filter>Common\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Common\Core\GameTimer.cpp">
+      <Filter>Common\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Common\Core\Input.cpp">
+      <Filter>Common\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Common\D3D12\d3dUtil.cpp">
+      <Filter>Common\D3D12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Common\D3D12\Renderer.cpp">
+      <Filter>Common\D3D12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Common\Scene\Camera.cpp">
+      <Filter>Common\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Common\Scene\Scene.cpp">
+      <Filter>Common\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Common\Assets\Texture.cpp">
+      <Filter>Common\Assets</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Common\Assets\TextureManager.cpp">
+      <Filter>Common\Assets</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Common\Assets\MathHelper.cpp">
+      <Filter>Common\Assets</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Common\Assets\tiny_obj_loader.cc">
+      <Filter>Common\Assets</Filter>
+    </ClCompile>
+    <ClCompile Include="Objects\Sponza\SponzaObject.cpp">
+      <Filter>Main\Objects\Sponza</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Objects\Box\BoxObject.h">
+      <Filter>Main\Objects\Box</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\Core\Config.h">
+      <Filter>Common\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\Core\d3dApp.h">
+      <Filter>Common\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\Core\GameTimer.h">
+      <Filter>Common\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\Core\Input.h">
+      <Filter>Common\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\D3D12\d3dUtil.h">
+      <Filter>Common\D3D12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\D3D12\d3dx12.h">
+      <Filter>Common\D3D12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\D3D12\Renderer.h">
+      <Filter>Common\D3D12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\Scene\Camera.h">
+      <Filter>Common\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\Scene\GameObject.h">
+      <Filter>Common\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\Scene\Scene.h">
+      <Filter>Common\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\Assets\Texture.h">
+      <Filter>Common\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\Assets\TextureManager.h">
+      <Filter>Common\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\Assets\MathHelper.h">
+      <Filter>Common\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\Assets\tiny_obj_loader.h">
+      <Filter>Common\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="Objects\Sponza\SponzaObject.h">
+      <Filter>Main\Objects\Sponza</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Debug\Shaders\texture.hlsl">
+      <Filter>Shader Files</Filter>
+    </None>
+  </ItemGroup>
+</Project>

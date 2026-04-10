@@ -21,7 +21,7 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{B590A678-E935-4AED-AF1F-3B6D02A4AE95}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>Box</RootNamespace>
+    <RootNamespace>MainApp</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -71,15 +71,23 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
+    <OutDir>$(ProjectDir)Debug\</OutDir>
+    <IntDir>$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
+    <OutDir>$(ProjectDir)Debug\</OutDir>
+    <IntDir>$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
+    <OutDir>$(ProjectDir)Release\</OutDir>
+    <IntDir>$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
+    <OutDir>$(ProjectDir)Release\</OutDir>
+    <IntDir>$(ProjectName)\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -138,33 +146,38 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\Common\Camera.cpp" />
-    <ClCompile Include="..\..\Common\d3dApp.cpp" />
-    <ClCompile Include="..\..\Common\d3dUtil.cpp" />
-    <ClCompile Include="..\..\Common\GameTimer.cpp" />
-    <ClCompile Include="..\..\Common\Input.cpp" />
-    <ClCompile Include="..\..\Common\MathHelper.cpp" />
-    <ClCompile Include="..\..\Common\Renderer.cpp" />
-    <ClCompile Include="..\..\Common\Scene.cpp" />
-    <ClCompile Include="..\..\Common\tiny_obj_loader.cc" />
-    <ClCompile Include="..\..\Main\Sponza\SponzaObject.cpp" />
-    <ClCompile Include="BoxApp.cpp" />
-    <ClCompile Include="BoxObject.cpp" />
+    <ClCompile Include="..\Common\Scene\Camera.cpp" />
+    <ClCompile Include="..\Common\Assets\Texture.cpp" />
+    <ClCompile Include="..\Common\Assets\TextureManager.cpp" />
+    <ClCompile Include="..\Common\Core\d3dApp.cpp" />
+    <ClCompile Include="..\Common\D3D12\d3dUtil.cpp" />
+    <ClCompile Include="..\Common\Core\GameTimer.cpp" />
+    <ClCompile Include="..\Common\Core\Input.cpp" />
+    <ClCompile Include="..\Common\Assets\MathHelper.cpp" />
+    <ClCompile Include="..\Common\D3D12\Renderer.cpp" />
+    <ClCompile Include="..\Common\Scene\Scene.cpp" />
+    <ClCompile Include="..\Common\Assets\tiny_obj_loader.cc" />
+    <ClCompile Include="Objects\Sponza\SponzaObject.cpp" />
+    <ClCompile Include="MainApp.cpp" />
+    <ClCompile Include="Objects\Box\BoxObject.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\Common\Camera.h" />
-    <ClInclude Include="..\..\Common\Config.h" />
-    <ClInclude Include="..\..\Common\d3dApp.h" />
-    <ClInclude Include="..\..\Common\d3dUtil.h" />
-    <ClInclude Include="..\..\Common\GameObject.h" />
-    <ClInclude Include="..\..\Common\GameTimer.h" />
-    <ClInclude Include="..\..\Common\Input.h" />
-    <ClInclude Include="..\..\Common\MathHelper.h" />
-    <ClInclude Include="..\..\Common\Renderer.h" />
-    <ClInclude Include="..\..\Common\Scene.h" />
-    <ClInclude Include="..\..\Common\tiny_obj_loader.h" />
-    <ClInclude Include="..\..\Main\Sponza\SponzaObject.h" />
-    <ClInclude Include="BoxObject.h" />
+    <ClInclude Include="..\Common\Scene\Camera.h" />
+    <ClInclude Include="..\Common\Assets\Texture.h" />
+    <ClInclude Include="..\Common\Assets\TextureManager.h" />
+    <ClInclude Include="..\Common\Core\Config.h" />
+    <ClInclude Include="..\Common\Core\d3dApp.h" />
+    <ClInclude Include="..\Common\D3D12\d3dUtil.h" />
+    <ClInclude Include="..\Common\Scene\GameObject.h" />
+    <ClInclude Include="..\Common\Core\GameTimer.h" />
+    <ClInclude Include="..\Common\Core\Input.h" />
+    <ClInclude Include="..\Common\Assets\MathHelper.h" />
+    <ClInclude Include="..\Common\D3D12\Renderer.h" />
+    <ClInclude Include="..\Common\Scene\Scene.h" />
+    <ClInclude Include="..\Common\Assets\tiny_obj_loader.h" />
+    <ClInclude Include="..\Common\D3D12\d3dx12.h" />
+    <ClInclude Include="Objects\Sponza\SponzaObject.h" />
+    <ClInclude Include="Objects\Box\BoxObject.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

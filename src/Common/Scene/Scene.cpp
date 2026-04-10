@@ -1,31 +1,27 @@
 #include "Scene.h"
-#include "../Main/Box/BoxObject.h"
-#include "../Main/Sponza/SponzaObject.h"
+#include "../../Main/Objects/Box/BoxObject.h"
+#include "../../Main/Objects/Sponza/SponzaObject.h"
+#include "../Assets/TextureManager.h"
 #include <algorithm>
 
 using namespace DirectX;
 
 Scene::Scene()
+    : mTextureManager(nullptr)
 {
 }
 
-bool Scene::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList)
+bool Scene::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, TextureManager* textureManager)
 {
+    mTextureManager = textureManager;
+
     auto sponza = std::make_unique<SponzaObject>("Sponza");
     sponza->SetPosition(0.0f, 0.0f, 0.0f);
     sponza->SetRotation(0.0f, 0.0f, 0.0f);
     sponza->SetScale(1.0f, 1.0f, 1.0f);
-    if (!sponza->Initialize(device, cmdList))
+    if (!sponza->Initialize(device, cmdList, textureManager))
         return false;
     AddObject(std::move(sponza));
-
-    auto box = std::make_unique<BoxObject>("GrayCube");
-    box->SetPosition(2.0f, 2.0f, 0.0f);
-    box->SetRotation(0.0f, 0.0f, 0.0f);
-    box->SetScale(0.5f, 0.5f, 0.5f);
-    if (!box->Initialize(device, cmdList))
-        return false;
-    AddObject(std::move(box));
 
     return true;
 }

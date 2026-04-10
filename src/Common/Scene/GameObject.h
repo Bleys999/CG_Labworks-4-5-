@@ -1,8 +1,10 @@
 #pragma once
 
-#include "d3dUtil.h"
-#include "GameTimer.h"
+#include "../D3D12/d3dUtil.h"
+#include "../Core/GameTimer.h"
 #include <string>
+
+class TextureManager;
 
 class GameObject
 {
@@ -13,8 +15,10 @@ public:
 
     virtual void Update(const GameTimer& gt) = 0;
     virtual void Draw(ID3D12GraphicsCommandList* cmdList) = 0;
-    virtual bool Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList) = 0;
     virtual void UpdateConstantBuffer(DirectX::FXMMATRIX view, DirectX::FXMMATRIX proj) = 0;
+
+    virtual bool Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList) { return true; }
+    virtual bool Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, TextureManager* textureManager) { return true; }
 
     void SetPosition(float x, float y, float z) { mPosition = DirectX::XMFLOAT3(x, y, z); }
     void SetPosition(const DirectX::XMFLOAT3& pos) { mPosition = pos; }

@@ -1,10 +1,10 @@
 #ifndef CAMERA_H
 #define CAMERA_H
 
-#include "d3dUtil.h"
-#include "MathHelper.h"
-#include "GameTimer.h"
-#include "Input.h"
+#include "../D3D12/d3dUtil.h"
+#include "../Assets/MathHelper.h"
+#include "../Core/GameTimer.h"
+#include "../Core/Input.h"
 
 class Camera
 {

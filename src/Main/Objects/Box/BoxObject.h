@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../../Common/d3dUtil.h"
-#include "../../Common/GameTimer.h"
-#include "../../Common/GameObject.h"
+#include "../../../Common/D3D12/d3dUtil.h"
+#include "../../../Common/Core/GameTimer.h"
+#include "../../../Common/Scene/GameObject.h"
 
 class BoxObject : public GameObject
 {

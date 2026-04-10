@@ -11,4 +11,9 @@ struct Config
     static constexpr float ClearColorG = 0.52f;
     static constexpr float ClearColorB = 0.80f;
     static constexpr float ClearColorA = 1.0f;
+
+    static constexpr float TextureTileU = 3.0f;
+    static constexpr float TextureTileV = 3.0f;
+    static constexpr float TextureScrollSpeedU = 0.04f;
+    static constexpr float TextureScrollSpeedV = 0.03f;
 };

@@ -3,6 +3,8 @@
 #include "d3dUtil.h"
 #include <vector>
 
+class TextureManager;
+
 class Renderer
 {
 public:

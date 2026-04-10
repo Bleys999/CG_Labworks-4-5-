@@ -1,16 +1,17 @@
-#include "../../Common/d3dApp.h"
-#include "../../Common/Camera.h"
-#include "../../Common/Scene.h"
-#include "../../Common/Renderer.h"
-#include "../../Common/Input.h"
-#include "../../Common/Config.h"
+#include "../Common/Core/d3dApp.h"
+#include "../Common/Scene/Camera.h"
+#include "../Common/Scene/Scene.h"
+#include "../Common/D3D12/Renderer.h"
+#include "../Common/Core/Input.h"
+#include "../Common/Assets/TextureManager.h"
+#include "../Common/Core/Config.h"
 
 using namespace DirectX;
 
-class BoxApp : public D3DApp
+class MainApp : public D3DApp
 {
 public:
-    BoxApp(HINSTANCE hInstance);
+    MainApp(HINSTANCE hInstance);
     virtual bool Initialize() override;
     virtual void Update(const GameTimer& gt) override;
     virtual void Draw(const GameTimer& gt) override;
@@ -28,18 +29,24 @@ private:
     Scene mScene;
     Renderer mRenderer;
     Input mInput;
+    TextureManager mTextureManager;
 };
 
-BoxApp::BoxApp(HINSTANCE hInstance) : D3DApp(hInstance) {}
+MainApp::MainApp(HINSTANCE hInstance) : D3DApp(hInstance) {}
 
-bool BoxApp::Initialize()
+bool MainApp::Initialize()
 {
     if (!D3DApp::Initialize()) return false;
 
     ThrowIfFailed(mCommandList->Reset(mDirectCmdListAlloc.Get(), nullptr));
 
+    mCamera.SetPosition(0.0f, 5.0f, -20.0f);
+    mCamera.SetSpeed(Config::CameraSpeed);
+    mCamera.SetSensitivity(Config::CameraSensitivity);
+
+    if (!mTextureManager.Initialize(md3dDevice.Get(), mCommandList.Get())) return false;
     if (!mRenderer.Initialize(md3dDevice.Get())) return false;
-    if (!mScene.Initialize(md3dDevice.Get(), mCommandList.Get())) return false;
+    if (!mScene.Initialize(md3dDevice.Get(), mCommandList.Get(), &mTextureManager)) return false;
 
     ThrowIfFailed(mCommandList->Close());
     ID3D12CommandList* cmdsLists[] = { mCommandList.Get() };
@@ -49,21 +56,24 @@ bool BoxApp::Initialize()
     return true;
 }
 
-void BoxApp::OnResize()
+void MainApp::OnResize()
 {
     D3DApp::OnResize();
-    mCamera.SetLens(Config::CameraFOV, AspectRatio(),
-        Config::CameraNearZ, Config::CameraFarZ);
+    if (md3dDevice)
+    {
+        mCamera.SetLens(Config::CameraFOV, AspectRatio(),
+            Config::CameraNearZ, Config::CameraFarZ);
+    }
 }
 
-void BoxApp::Update(const GameTimer& gt)
+void MainApp::Update(const GameTimer& gt)
 {
     mCamera.HandleInput(gt, mInput);
     mInput.ResetMouseDelta();
     mScene.Update(gt, mCamera);
 }
 
-void BoxApp::Draw(const GameTimer& gt)
+void MainApp::Draw(const GameTimer& gt)
 {
     ThrowIfFailed(mDirectCmdListAlloc->Reset());
     ThrowIfFailed(mCommandList->Reset(mDirectCmdListAlloc.Get(), mRenderer.GetPSO()));
@@ -97,23 +107,23 @@ void BoxApp::Draw(const GameTimer& gt)
     FlushCommandQueue();
 }
 
-void BoxApp::OnMouseDown(WPARAM btnState, int x, int y)
+void MainApp::OnMouseDown(WPARAM btnState, int x, int y)
 {
     mInput.OnMouseDown(x, y); SetCapture(mhMainWnd);
 }
-void BoxApp::OnMouseUp(WPARAM btnState, int x, int y)
+void MainApp::OnMouseUp(WPARAM btnState, int x, int y)
 {
     mInput.OnMouseUp(); ReleaseCapture();
 }
-void BoxApp::OnMouseMove(WPARAM btnState, int x, int y)
+void MainApp::OnMouseMove(WPARAM btnState, int x, int y)
 {
     mInput.OnMouseMove(x, y, (btnState & MK_LBUTTON) != 0);
 }
-void BoxApp::OnKeyDown(WPARAM keyState, int x, int y)
+void MainApp::OnKeyDown(WPARAM keyState, int x, int y)
 {
     mInput.OnKeyDown(keyState);
 }
-void BoxApp::OnKeyUp(WPARAM keyState, int x, int y)
+void MainApp::OnKeyUp(WPARAM keyState, int x, int y)
 {
     mInput.OnKeyUp(keyState);
 }
@@ -126,7 +136,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PSTR cmdLine, in
 
     try
     {
-        BoxApp theApp(hInstance);
+        MainApp theApp(hInstance);
         if (!theApp.Initialize())
             return 0;
         return theApp.Run();

@@ -5,7 +5,7 @@
 #include <crtdbg.h>
 #endif
 
-#include "d3dUtil.h"
+#include "../D3D12/d3dUtil.h"
 #include "GameTimer.h"
 
 #pragma comment(lib,"d3dcompiler.lib")
