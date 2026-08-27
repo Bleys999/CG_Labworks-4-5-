@@ -59,6 +59,7 @@ void SponzaObject::UpdateConstantBuffer(DirectX::FXMMATRIX view, DirectX::FXMMAT
     XMMATRIX world = GetWorldMatrix();
     XMMATRIX worldViewProj = world * view * proj;
     XMStoreFloat4x4(&mWorldViewProj, XMMatrixTranspose(worldViewProj));
+    XMStoreFloat4x4(&mWorld, XMMatrixTranspose(world));
 }
 
 void SponzaObject::Draw(ID3D12GraphicsCommandList* cmdList)
@@ -76,6 +77,7 @@ void SponzaObject::Draw(ID3D12GraphicsCommandList* cmdList)
 
         ObjectConstants oc{};
         oc.WorldViewProj = mWorldViewProj;
+        oc.World = mWorld;
         oc.DiffuseFactor = batch.DiffuseFactor;
         oc.UVScale = mUVScale;
         oc.UVOffset = mUVOffset;

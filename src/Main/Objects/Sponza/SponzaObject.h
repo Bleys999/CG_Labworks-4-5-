@@ -47,6 +47,7 @@ private:
     TextureManager* mTextureManager = nullptr;
     std::vector<MaterialDrawBatch> mMaterialBatches;
     DirectX::XMFLOAT4X4 mWorldViewProj = MathHelper::Identity4x4();
+    DirectX::XMFLOAT4X4 mWorld = MathHelper::Identity4x4();
     DirectX::XMFLOAT2 mUVScale = { Config::TextureTileU, Config::TextureTileV };
     DirectX::XMFLOAT2 mUVOffset = { 0.0f, 0.0f };
 };

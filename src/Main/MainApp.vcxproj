@@ -155,6 +155,8 @@
     <ClCompile Include="..\Common\Core\Input.cpp" />
     <ClCompile Include="..\Common\Assets\MathHelper.cpp" />
     <ClCompile Include="..\Common\D3D12\Renderer.cpp" />
+    <ClCompile Include="..\Common\Rendering\GBuffer.cpp" />
+    <ClCompile Include="..\Common\Rendering\RenderingSystem.cpp" />
     <ClCompile Include="..\Common\Scene\Scene.cpp" />
     <ClCompile Include="..\Common\Assets\tiny_obj_loader.cc" />
     <ClCompile Include="Objects\Sponza\SponzaObject.cpp" />
@@ -173,6 +175,8 @@
     <ClInclude Include="..\Common\Core\Input.h" />
     <ClInclude Include="..\Common\Assets\MathHelper.h" />
     <ClInclude Include="..\Common\D3D12\Renderer.h" />
+    <ClInclude Include="..\Common\Rendering\GBuffer.h" />
+    <ClInclude Include="..\Common\Rendering\RenderingSystem.h" />
     <ClInclude Include="..\Common\Scene\Scene.h" />
     <ClInclude Include="..\Common\Assets\tiny_obj_loader.h" />
     <ClInclude Include="..\Common\D3D12\d3dx12.h" />

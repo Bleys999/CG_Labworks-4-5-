@@ -1,7 +1,7 @@
 #include "../Common/Core/d3dApp.h"
 #include "../Common/Scene/Camera.h"
 #include "../Common/Scene/Scene.h"
-#include "../Common/D3D12/Renderer.h"
+#include "../Common/Rendering/RenderingSystem.h"
 #include "../Common/Core/Input.h"
 #include "../Common/Assets/TextureManager.h"
 #include "../Common/Core/Config.h"
@@ -27,7 +27,7 @@ private:
 private:
     Camera mCamera;
     Scene mScene;
-    Renderer mRenderer;
+    RenderingSystem mRendering;
     Input mInput;
     TextureManager mTextureManager;
 };
@@ -45,7 +45,7 @@ bool MainApp::Initialize()
     mCamera.SetSensitivity(Config::CameraSensitivity);
 
     if (!mTextureManager.Initialize(md3dDevice.Get(), mCommandList.Get())) return false;
-    if (!mRenderer.Initialize(md3dDevice.Get())) return false;
+    if (!mRendering.Initialize(md3dDevice.Get())) return false;
     if (!mScene.Initialize(md3dDevice.Get(), mCommandList.Get(), &mTextureManager)) return false;
 
     ThrowIfFailed(mCommandList->Close());
@@ -63,6 +63,7 @@ void MainApp::OnResize()
     {
         mCamera.SetLens(Config::CameraFOV, AspectRatio(),
             Config::CameraNearZ, Config::CameraFarZ);
+        mRendering.Resize(md3dDevice.Get(), mClientWidth, mClientHeight);
     }
 }
 
@@ -76,24 +77,27 @@ void MainApp::Update(const GameTimer& gt)
 void MainApp::Draw(const GameTimer& gt)
 {
     ThrowIfFailed(mDirectCmdListAlloc->Reset());
-    ThrowIfFailed(mCommandList->Reset(mDirectCmdListAlloc.Get(), mRenderer.GetPSO()));
+    ThrowIfFailed(mCommandList->Reset(mDirectCmdListAlloc.Get(), mRendering.GetGeometryPSO()));
+
+    mRendering.UpdateLightingConstants(mCamera);
 
     mCommandList->RSSetViewports(1, &mScreenViewport);
     mCommandList->RSSetScissorRects(1, &mScissorRect);
+
+    GBuffer& gbuffer = mRendering.GetGBuffer();
+    float gbClear[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    gbuffer.BeginGeometryPass(mCommandList.Get(), gbClear);
+
+    mRendering.ApplyGeometryPass(mCommandList.Get());
+    mScene.Draw(mCommandList.Get());
+
+    gbuffer.EndGeometryPass(mCommandList.Get());
 
     auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
         CurrentBackBuffer(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
     mCommandList->ResourceBarrier(1, &barrier);
 
-    mCommandList->ClearRenderTargetView(CurrentBackBufferView(),
-        Colors::LightSteelBlue, 0, nullptr);
-    mCommandList->ClearDepthStencilView(DepthStencilView(),
-        D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
-
-    mCommandList->OMSetRenderTargets(1, &CurrentBackBufferView(), true, &DepthStencilView());
-
-    mRenderer.Apply(mCommandList.Get());
-    mScene.Draw(mCommandList.Get());
+    mRendering.DrawDeferredLighting(mCommandList.Get(), CurrentBackBufferView(), mScreenViewport, mScissorRect);
 
     auto barrier2 = CD3DX12_RESOURCE_BARRIER::Transition(
         CurrentBackBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);

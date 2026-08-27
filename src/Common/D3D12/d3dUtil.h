@@ -167,9 +167,10 @@ struct Vertex
 struct ObjectConstants
 {
     DirectX::XMFLOAT4X4 WorldViewProj = MathHelper::Identity4x4();
+    DirectX::XMFLOAT4X4 World = MathHelper::Identity4x4();
     DirectX::XMFLOAT4 DiffuseFactor = { 1.0f, 1.0f, 1.0f, 1.0f };
     DirectX::XMFLOAT2 UVScale = { 1.0f, 1.0f };
     DirectX::XMFLOAT2 UVOffset = { 0.0f, 0.0f };
-    float Padding[40] = {};
+    float Padding[24] = {};
 };
 static_assert(sizeof(ObjectConstants) == 256, "ObjectConstants must be 256 bytes");
