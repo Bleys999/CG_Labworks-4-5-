@@ -73,6 +73,12 @@
     <ClCompile Include="..\Common\Scene\Scene.cpp">
       <Filter>Common\Scene</Filter>
     </ClCompile>
+    <ClCompile Include="..\Common\Scene\Octree.cpp">
+      <Filter>Common\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Common\Assets\GeometryGenerator.cpp">
+      <Filter>Common\Assets</Filter>
+    </ClCompile>
     <ClCompile Include="..\Common\Assets\Texture.cpp">
       <Filter>Common\Assets</Filter>
     </ClCompile>
@@ -128,6 +134,12 @@
     </ClInclude>
     <ClInclude Include="..\Common\Scene\Scene.h">
       <Filter>Common\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\Scene\Octree.h">
+      <Filter>Common\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\Assets\GeometryGenerator.h">
+      <Filter>Common\Assets</Filter>
     </ClInclude>
     <ClInclude Include="..\Common\Assets\Texture.h">
       <Filter>Common\Assets</Filter>

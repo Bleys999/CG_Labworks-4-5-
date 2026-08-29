@@ -14,7 +14,7 @@ public:
     void OnMouseUp();
     void OnMouseMove(int x, int y, bool buttonDown);
 
-    bool IsKeyDown(WPARAM key) const { return mKeys[key]; }
+    bool IsKeyDown(WPARAM key) const { return key < 256 && mKeys[key]; }
     int GetMouseDeltaX() const { return mMouseDeltaX; }
     int GetMouseDeltaY() const { return mMouseDeltaY; }
     bool IsMouseButtonDown() const { return mMouseButtonDown; }

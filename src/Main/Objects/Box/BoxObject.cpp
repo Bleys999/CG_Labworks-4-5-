@@ -1,6 +1,10 @@
 #include "BoxObject.h"
+#include "../../../Common/Assets/GeometryGenerator.h"
+#include <cmath>
 
 using namespace DirectX;
+
+std::shared_ptr<MeshGeometry> BoxObject::sSharedGeometry;
 
 const std::array<Vertex, 8> BoxObject::sVertices = { {
     { XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT4(0.7f, 0.7f, 0.7f, 1.0f) },
@@ -24,18 +28,41 @@ const std::array<std::uint16_t, 36> BoxObject::sIndices = { {
 
 BoxObject::BoxObject() : GameObject("Box")
 {
+    SetCullable(true);
+    BoundingBox local;
+    local.Center = XMFLOAT3(0.0f, 0.0f, 0.0f);
+    const float e = fabsf(sVertices[0].Pos.x);
+    local.Extents = XMFLOAT3(e, e, e);
+    SetLocalBounds(local);
 }
 
 BoxObject::BoxObject(const std::string& name) : GameObject(name)
 {
+    SetCullable(true);
+    BoundingBox local;
+    local.Center = XMFLOAT3(0.0f, 0.0f, 0.0f);
+    const float e = fabsf(sVertices[0].Pos.x);
+    local.Extents = XMFLOAT3(e, e, e);
+    SetLocalBounds(local);
 }
 
 bool BoxObject::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList)
 {
-    if (!CreateGeometry(device, cmdList))
+    if (!CreateSharedGeometry(device, cmdList))
         return false;
 
+    mGeometry = sSharedGeometry;
     mObjectCB = std::make_unique<UploadBuffer<ObjectConstants>>(device, 1, true);
+    return true;
+}
+
+bool BoxObject::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, TextureManager* textureManager)
+{
+    if (!Initialize(device, cmdList))
+        return false;
+
+    if (textureManager)
+        mTexture = textureManager->GetWhiteTexture();
     return true;
 }
 
@@ -45,7 +72,7 @@ void BoxObject::Update(const GameTimer& gt)
 
 void BoxObject::UpdateConstantBuffer(DirectX::FXMMATRIX view, DirectX::FXMMATRIX proj)
 {
-    if (!mVisible) return;
+    if (!mVisible || !mObjectCB) return;
 
     XMMATRIX world = GetWorldMatrix();
     XMMATRIX worldViewProj = world * view * proj;
@@ -53,7 +80,7 @@ void BoxObject::UpdateConstantBuffer(DirectX::FXMMATRIX view, DirectX::FXMMATRIX
     ObjectConstants objConstants{};
     XMStoreFloat4x4(&objConstants.WorldViewProj, XMMatrixTranspose(worldViewProj));
     XMStoreFloat4x4(&objConstants.World, XMMatrixTranspose(world));
-    objConstants.DiffuseFactor = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+    objConstants.DiffuseFactor = mDiffuseFactor;
     objConstants.UVScale = XMFLOAT2(1.0f, 1.0f);
     objConstants.UVOffset = XMFLOAT2(0.0f, 0.0f);
 
@@ -66,6 +93,13 @@ void BoxObject::Draw(ID3D12GraphicsCommandList* cmdList)
 
     cmdList->SetGraphicsRootConstantBufferView(0, mObjectCB->Resource()->GetGPUVirtualAddress());
 
+    if (mTexture)
+    {
+        ID3D12DescriptorHeap* heap = mTexture->GetDescriptorHeap();
+        cmdList->SetDescriptorHeaps(1, &heap);
+        cmdList->SetGraphicsRootDescriptorTable(1, mTexture->GetSRV());
+    }
+
     cmdList->IASetVertexBuffers(0, 1, &mGeometry->VertexBufferView());
     cmdList->IASetIndexBuffer(&mGeometry->IndexBufferView());
     cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -73,37 +107,55 @@ void BoxObject::Draw(ID3D12GraphicsCommandList* cmdList)
     cmdList->DrawIndexedInstanced(mGeometry->DrawArgs["box"].IndexCount, 1, 0, 0, 0);
 }
 
-bool BoxObject::CreateGeometry(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList)
+bool BoxObject::CreateSharedGeometry(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList)
 {
-    mGeometry = std::make_unique<MeshGeometry>();
-    mGeometry->Name = "boxGeo";
+    if (sSharedGeometry)
+        return true;
 
-    const UINT vbByteSize = (UINT)sVertices.size() * sizeof(Vertex);
-    const UINT ibByteSize = (UINT)sIndices.size() * sizeof(std::uint16_t);
+    GeometryGenerator geoGen;
+    GeometryGenerator::MeshData box = geoGen.CreateBox(2.0f, 2.0f, 2.0f, 0);
 
-    ThrowIfFailed(D3DCreateBlob(vbByteSize, &mGeometry->VertexBufferCPU));
-    CopyMemory(mGeometry->VertexBufferCPU->GetBufferPointer(), sVertices.data(), vbByteSize);
+    std::vector<ObjVertex> vertices(box.Vertices.size());
+    for (size_t i = 0; i < box.Vertices.size(); ++i)
+    {
+        vertices[i].Pos = box.Vertices[i].Position;
+        vertices[i].Normal = box.Vertices[i].Normal;
+        vertices[i].TexC = box.Vertices[i].TexC;
+    }
 
-    ThrowIfFailed(D3DCreateBlob(ibByteSize, &mGeometry->IndexBufferCPU));
-    CopyMemory(mGeometry->IndexBufferCPU->GetBufferPointer(), sIndices.data(), ibByteSize);
+    const std::vector<std::uint16_t>& indices = box.GetIndices16();
 
-    mGeometry->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(device,
-        cmdList, sVertices.data(), vbByteSize, mGeometry->VertexBufferUploader);
+    sSharedGeometry = std::make_shared<MeshGeometry>();
+    sSharedGeometry->Name = "boxGeo";
 
-    mGeometry->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(device,
-        cmdList, sIndices.data(), ibByteSize, mGeometry->IndexBufferUploader);
+    const UINT vbByteSize = (UINT)vertices.size() * sizeof(ObjVertex);
+    const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
 
-    mGeometry->VertexByteStride = sizeof(Vertex);
-    mGeometry->VertexBufferByteSize = vbByteSize;
-    mGeometry->IndexFormat = DXGI_FORMAT_R16_UINT;
-    mGeometry->IndexBufferByteSize = ibByteSize;
+    ThrowIfFailed(D3DCreateBlob(vbByteSize, &sSharedGeometry->VertexBufferCPU));
+    CopyMemory(sSharedGeometry->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
+
+    ThrowIfFailed(D3DCreateBlob(ibByteSize, &sSharedGeometry->IndexBufferCPU));
+    CopyMemory(sSharedGeometry->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
+
+    sSharedGeometry->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(device,
+        cmdList, vertices.data(), vbByteSize, sSharedGeometry->VertexBufferUploader);
+
+    sSharedGeometry->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(device,
+        cmdList, indices.data(), ibByteSize, sSharedGeometry->IndexBufferUploader);
+
+    sSharedGeometry->VertexByteStride = sizeof(ObjVertex);
+    sSharedGeometry->VertexBufferByteSize = vbByteSize;
+    sSharedGeometry->IndexFormat = DXGI_FORMAT_R16_UINT;
+    sSharedGeometry->IndexBufferByteSize = ibByteSize;
 
     SubmeshGeometry submesh;
-    submesh.IndexCount = (UINT)sIndices.size();
+    submesh.IndexCount = (UINT)indices.size();
     submesh.StartIndexLocation = 0;
     submesh.BaseVertexLocation = 0;
+    submesh.Bounds.Center = XMFLOAT3(0.0f, 0.0f, 0.0f);
+    submesh.Bounds.Extents = XMFLOAT3(1.0f, 1.0f, 1.0f);
 
-    mGeometry->DrawArgs["box"] = submesh;
+    sSharedGeometry->DrawArgs["box"] = submesh;
 
     return true;
 }

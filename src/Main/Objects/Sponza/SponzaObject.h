@@ -11,13 +11,6 @@
 #include <memory>
 #include <vector>
 
-struct ObjVertex
-{
-    DirectX::XMFLOAT3 Pos;
-    DirectX::XMFLOAT3 Normal;
-    DirectX::XMFLOAT2 TexC;
-};
-
 class SponzaObject : public GameObject
 {
 public:

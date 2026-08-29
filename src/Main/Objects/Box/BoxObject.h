@@ -3,6 +3,10 @@
 #include "../../../Common/D3D12/d3dUtil.h"
 #include "../../../Common/Core/GameTimer.h"
 #include "../../../Common/Scene/GameObject.h"
+#include "../../../Common/Assets/TextureManager.h"
+#include "../../../Common/Assets/Texture.h"
+#include <memory>
+#include <array>
 
 class BoxObject : public GameObject
 {
@@ -12,17 +16,23 @@ public:
     virtual ~BoxObject() = default;
 
     virtual bool Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList) override;
+    virtual bool Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, TextureManager* textureManager) override;
     virtual void Update(const GameTimer& gt) override;
     virtual void Draw(ID3D12GraphicsCommandList* cmdList) override;
     virtual void UpdateConstantBuffer(DirectX::FXMMATRIX view, DirectX::FXMMATRIX proj) override;
 
-private:
-    bool CreateGeometry(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList);
+    void SetDiffuseFactor(const DirectX::XMFLOAT4& color) { mDiffuseFactor = color; }
 
 private:
-    std::unique_ptr<MeshGeometry> mGeometry = nullptr;
-    std::unique_ptr<UploadBuffer<ObjectConstants>> mObjectCB = nullptr;
+    bool CreateSharedGeometry(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList);
 
+private:
+    std::shared_ptr<MeshGeometry> mGeometry;
+    std::unique_ptr<UploadBuffer<ObjectConstants>> mObjectCB;
+    std::shared_ptr<Texture> mTexture;
+    DirectX::XMFLOAT4 mDiffuseFactor = { 1.0f, 1.0f, 1.0f, 1.0f };
+
+    static std::shared_ptr<MeshGeometry> sSharedGeometry;
     static const std::array<Vertex, 8> sVertices;
     static const std::array<std::uint16_t, 36> sIndices;
 };

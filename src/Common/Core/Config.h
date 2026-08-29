@@ -16,4 +16,8 @@ struct Config
     static constexpr float TextureTileV = 3.0f;
     static constexpr float TextureScrollSpeedU = 0.04f;
     static constexpr float TextureScrollSpeedV = 0.03f;
+
+    static constexpr int ScatteredObjectCount = 1000;
+    static constexpr int OctreeMaxDepth = 6;
+    static constexpr int OctreeMaxLeafObjects = 4;
 };

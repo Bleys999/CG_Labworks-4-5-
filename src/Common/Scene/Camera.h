@@ -40,6 +40,8 @@ public:
     void LookAt(DirectX::FXMVECTOR pos, DirectX::FXMVECTOR target, DirectX::FXMVECTOR worldUp);
     void LookAt(const DirectX::XMFLOAT3& pos, const DirectX::XMFLOAT3& target, const DirectX::XMFLOAT3& up);
 
+    DirectX::BoundingFrustum GetWorldFrustum()const;
+
     DirectX::XMMATRIX GetView()const;
     DirectX::XMMATRIX GetProj()const;
     DirectX::XMFLOAT4X4 GetView4x4f()const;

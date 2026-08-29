@@ -155,6 +155,15 @@ void Camera::LookAt(const XMFLOAT3& pos, const XMFLOAT3& target, const XMFLOAT3&
     mViewDirty = true;
 }
 
+BoundingFrustum Camera::GetWorldFrustum()const
+{
+    BoundingFrustum frustum;
+    BoundingFrustum::CreateFromMatrix(frustum, GetProj());
+    XMMATRIX invView = XMMatrixInverse(nullptr, GetView());
+    frustum.Transform(frustum, invView);
+    return frustum;
+}
+
 XMMATRIX Camera::GetView()const
 {
     return XMLoadFloat4x4(&mView);

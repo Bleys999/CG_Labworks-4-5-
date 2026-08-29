@@ -20,16 +20,16 @@ public:
     virtual bool Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList) { return true; }
     virtual bool Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, TextureManager* textureManager) { return true; }
 
-    void SetPosition(float x, float y, float z) { mPosition = DirectX::XMFLOAT3(x, y, z); }
-    void SetPosition(const DirectX::XMFLOAT3& pos) { mPosition = pos; }
+    void SetPosition(float x, float y, float z) { mPosition = DirectX::XMFLOAT3(x, y, z); UpdateWorldBounds(); }
+    void SetPosition(const DirectX::XMFLOAT3& pos) { mPosition = pos; UpdateWorldBounds(); }
     DirectX::XMFLOAT3 GetPosition() const { return mPosition; }
 
-    void SetRotation(float x, float y, float z) { mRotation = DirectX::XMFLOAT3(x, y, z); }
-    void SetRotation(const DirectX::XMFLOAT3& rot) { mRotation = rot; }
+    void SetRotation(float x, float y, float z) { mRotation = DirectX::XMFLOAT3(x, y, z); UpdateWorldBounds(); }
+    void SetRotation(const DirectX::XMFLOAT3& rot) { mRotation = rot; UpdateWorldBounds(); }
     DirectX::XMFLOAT3 GetRotation() const { return mRotation; }
 
-    void SetScale(float x, float y, float z) { mScale = DirectX::XMFLOAT3(x, y, z); }
-    void SetScale(const DirectX::XMFLOAT3& scale) { mScale = scale; }
+    void SetScale(float x, float y, float z) { mScale = DirectX::XMFLOAT3(x, y, z); UpdateWorldBounds(); }
+    void SetScale(const DirectX::XMFLOAT3& scale) { mScale = scale; UpdateWorldBounds(); }
     DirectX::XMFLOAT3 GetScale() const { return mScale; }
 
     void SetName(const std::string& name) { mName = name; }
@@ -37,6 +37,22 @@ public:
 
     void SetVisible(bool visible) { mVisible = visible; }
     bool IsVisible() const { return mVisible; }
+
+    void SetCullable(bool cullable) { mCullable = cullable; }
+    bool IsCullable() const { return mCullable; }
+
+    void SetLocalBounds(const DirectX::BoundingBox& bounds)
+    {
+        mLocalBounds = bounds;
+        UpdateWorldBounds();
+    }
+
+    const DirectX::BoundingBox& GetWorldBounds() const { return mWorldBounds; }
+
+    void UpdateWorldBounds()
+    {
+        mLocalBounds.Transform(mWorldBounds, GetWorldMatrix());
+    }
 
 protected:
     DirectX::XMMATRIX GetWorldMatrix() const
@@ -53,4 +69,7 @@ protected:
     DirectX::XMFLOAT3 mScale = { 1.0f, 1.0f, 1.0f };
     std::string mName;
     bool mVisible = true;
+    bool mCullable = false;
+    DirectX::BoundingBox mLocalBounds = {};
+    DirectX::BoundingBox mWorldBounds = {};
 };

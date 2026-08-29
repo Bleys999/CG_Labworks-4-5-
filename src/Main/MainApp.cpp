@@ -5,6 +5,7 @@
 #include "../Common/Core/Input.h"
 #include "../Common/Assets/TextureManager.h"
 #include "../Common/Core/Config.h"
+#include <string>
 
 using namespace DirectX;
 
@@ -24,12 +25,16 @@ private:
     virtual void OnKeyDown(WPARAM keyState, int x, int y) override;
     virtual void OnKeyUp(WPARAM keyState, int x, int y) override;
 
+    void RefreshWindowCaption();
+
 private:
     Camera mCamera;
     Scene mScene;
     RenderingSystem mRendering;
     Input mInput;
     TextureManager mTextureManager;
+    bool mPrevF3 = false;
+    bool mPrevF4 = false;
 };
 
 MainApp::MainApp(HINSTANCE hInstance) : D3DApp(hInstance) {}
@@ -53,6 +58,7 @@ bool MainApp::Initialize()
     mCommandQueue->ExecuteCommandLists(1, cmdsLists);
     FlushCommandQueue();
 
+    RefreshWindowCaption();
     return true;
 }
 
@@ -69,6 +75,21 @@ void MainApp::OnResize()
 
 void MainApp::Update(const GameTimer& gt)
 {
+    const bool f3 = mInput.IsKeyDown(VK_F3);
+    const bool f4 = mInput.IsKeyDown(VK_F4);
+    if (f3 && !mPrevF3)
+    {
+        mScene.ToggleFrustumCulling();
+        RefreshWindowCaption();
+    }
+    if (f4 && !mPrevF4)
+    {
+        mScene.ToggleOctreeCulling();
+        RefreshWindowCaption();
+    }
+    mPrevF3 = f3;
+    mPrevF4 = f4;
+
     mCamera.HandleInput(gt, mInput);
     mInput.ResetMouseDelta();
     mScene.Update(gt, mCamera);
@@ -89,7 +110,8 @@ void MainApp::Draw(const GameTimer& gt)
     gbuffer.BeginGeometryPass(mCommandList.Get(), gbClear);
 
     mRendering.ApplyGeometryPass(mCommandList.Get());
-    mScene.Draw(mCommandList.Get());
+    mScene.Draw(mCommandList.Get(), mCamera);
+    RefreshWindowCaption();
 
     gbuffer.EndGeometryPass(mCommandList.Get());
 
@@ -130,6 +152,17 @@ void MainApp::OnKeyDown(WPARAM keyState, int x, int y)
 void MainApp::OnKeyUp(WPARAM keyState, int x, int y)
 {
     mInput.OnKeyUp(keyState);
+}
+
+void MainApp::RefreshWindowCaption()
+{
+    std::wstring frustum = mScene.IsFrustumCullingEnabled() ? L"ON" : L"OFF";
+    std::wstring octree = mScene.IsOctreeCullingEnabled() ? L"ON" : L"OFF";
+    mMainWndCaption = L"MainApp  F3 frustum:" + frustum +
+        L"  F4 octree:" + octree +
+        L"  drawn:" + std::to_wstring(mScene.GetDrawnCount()) +
+        L"/" + std::to_wstring(mScene.GetObjectCount()) +
+        L"  boxes:" + std::to_wstring(mScene.GetCullableCount());
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PSTR cmdLine, int showCmd)

@@ -164,6 +164,13 @@ struct Vertex
     DirectX::XMFLOAT4 Color;
 };
 
+struct ObjVertex
+{
+    DirectX::XMFLOAT3 Pos;
+    DirectX::XMFLOAT3 Normal;
+    DirectX::XMFLOAT2 TexC;
+};
+
 struct ObjectConstants
 {
     DirectX::XMFLOAT4X4 WorldViewProj = MathHelper::Identity4x4();

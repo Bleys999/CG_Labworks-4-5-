@@ -6,12 +6,14 @@ Input::Input()
 
 void Input::OnKeyDown(WPARAM keyState)
 {
-    mKeys[keyState] = true;
+    if (keyState < 256)
+        mKeys[keyState] = true;
 }
 
 void Input::OnKeyUp(WPARAM keyState)
 {
-    mKeys[keyState] = false;
+    if (keyState < 256)
+        mKeys[keyState] = false;
 }
 
 void Input::OnMouseDown(int x, int y)
