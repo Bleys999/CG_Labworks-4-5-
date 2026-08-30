@@ -20,4 +20,10 @@ struct Config
     static constexpr int ScatteredObjectCount = 1000;
     static constexpr int OctreeMaxDepth = 6;
     static constexpr int OctreeMaxLeafObjects = 4;
+
+    static constexpr float TessMin = 1.0f;
+    static constexpr float TessMax = 8.0f;
+    static constexpr float TessNear = 5.0f;
+    static constexpr float TessFar = 40.0f;
+    static constexpr float DisplacementScale = 0.06f;
 };

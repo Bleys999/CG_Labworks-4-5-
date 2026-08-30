@@ -19,6 +19,8 @@ public:
 
     virtual bool Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList) { return true; }
     virtual bool Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, TextureManager* textureManager) { return true; }
+    virtual bool UsesTessellation() const { return false; }
+    virtual void SetFrameCamera(const DirectX::XMFLOAT3&) {}
 
     void SetPosition(float x, float y, float z) { mPosition = DirectX::XMFLOAT3(x, y, z); UpdateWorldBounds(); }
     void SetPosition(const DirectX::XMFLOAT3& pos) { mPosition = pos; UpdateWorldBounds(); }

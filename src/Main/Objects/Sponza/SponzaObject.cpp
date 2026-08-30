@@ -2,8 +2,10 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include <cmath>
 
 using namespace DirectX;
+using Microsoft::WRL::ComPtr;
 
 namespace
 {
@@ -23,6 +25,54 @@ namespace
         }
         return modelsRoot + "\\" + p;
     }
+
+    std::string ToNormalMapPath(const std::string& albedoPath)
+    {
+        std::string p = albedoPath;
+        const char* from = "BaseColor";
+        const char* to = "Normal";
+        size_t at = p.find(from);
+        if (at == std::string::npos)
+            return {};
+        p.replace(at, strlen(from), to);
+        return p;
+    }
+
+    void ComputeTangents(std::vector<TessVertex>& vertices, const std::vector<uint32_t>& indices)
+    {
+        for (size_t i = 0; i + 2 < indices.size(); i += 3)
+        {
+            TessVertex& v0 = vertices[indices[i + 0]];
+            TessVertex& v1 = vertices[indices[i + 1]];
+            TessVertex& v2 = vertices[indices[i + 2]];
+
+            XMVECTOR p0 = XMLoadFloat3(&v0.Pos);
+            XMVECTOR p1 = XMLoadFloat3(&v1.Pos);
+            XMVECTOR p2 = XMLoadFloat3(&v2.Pos);
+            XMVECTOR e1 = XMVectorSubtract(p1, p0);
+            XMVECTOR e2 = XMVectorSubtract(p2, p0);
+
+            float du1 = v1.TexC.x - v0.TexC.x;
+            float dv1 = v1.TexC.y - v0.TexC.y;
+            float du2 = v2.TexC.x - v0.TexC.x;
+            float dv2 = v2.TexC.y - v0.TexC.y;
+            float det = du1 * dv2 - du2 * dv1;
+            if (fabsf(det) < 1e-8f)
+                det = 1.0f;
+            float inv = 1.0f / det;
+
+            XMVECTOR t = XMVectorScale(
+                XMVectorSubtract(XMVectorScale(e1, dv2), XMVectorScale(e2, dv1)),
+                inv);
+            t = XMVector3Normalize(t);
+
+            XMFLOAT3 tf;
+            XMStoreFloat3(&tf, t);
+            v0.Tangent = tf;
+            v1.Tangent = tf;
+            v2.Tangent = tf;
+        }
+    }
 }
 
 SponzaObject::SponzaObject() : GameObject("Sponza")
@@ -37,22 +87,30 @@ bool SponzaObject::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* c
 {
     mTextureManager = textureManager;
 
+    mFlatNormal = std::make_shared<Texture>();
+    if (!mFlatNormal->Create1x1RGBA8(device, cmdList, 128, 128, 255, 255))
+        return false;
+    mFlatHeight = std::make_shared<Texture>();
+    if (!mFlatHeight->Create1x1RGBA8(device, cmdList, 128, 128, 128, 255))
+        return false;
+
     if (!LoadModel(device, cmdList))
         return false;
 
     mObjectCB = std::make_unique<UploadBuffer<ObjectConstants>>(device, 1, true);
-
     return true;
+}
+
+void SponzaObject::SetFrameCamera(const XMFLOAT3& pos)
+{
+    mCameraWorld = pos;
 }
 
 void SponzaObject::Update(const GameTimer& gt)
 {
-    float t = gt.TotalTime();
-    mUVOffset.x = t * Config::TextureScrollSpeedU;
-    mUVOffset.y = t * Config::TextureScrollSpeedV;
 }
 
-void SponzaObject::UpdateConstantBuffer(DirectX::FXMMATRIX view, DirectX::FXMMATRIX proj)
+void SponzaObject::UpdateConstantBuffer(FXMMATRIX view, FXMMATRIX proj)
 {
     if (!mVisible) return;
 
@@ -68,11 +126,11 @@ void SponzaObject::Draw(ID3D12GraphicsCommandList* cmdList)
 
     cmdList->IASetVertexBuffers(0, 1, &mGeometry->VertexBufferView());
     cmdList->IASetIndexBuffer(&mGeometry->IndexBufferView());
-    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_3_CONTROL_POINT_PATCHLIST);
 
     for (const auto& batch : mMaterialBatches)
     {
-        if (batch.IndexCount == 0 || !batch.DiffuseTexture)
+        if (batch.IndexCount == 0 || !batch.SrvHeap)
             continue;
 
         ObjectConstants oc{};
@@ -81,16 +139,93 @@ void SponzaObject::Draw(ID3D12GraphicsCommandList* cmdList)
         oc.DiffuseFactor = batch.DiffuseFactor;
         oc.UVScale = mUVScale;
         oc.UVOffset = mUVOffset;
+        oc.CameraWorld = mCameraWorld;
+        oc.DisplacementScale = Config::DisplacementScale;
+        oc.TessMin = Config::TessMin;
+        oc.TessMax = Config::TessMax;
+        oc.TessNear = Config::TessNear;
+        oc.TessFar = Config::TessFar;
         mObjectCB->CopyData(0, oc);
 
         cmdList->SetGraphicsRootConstantBufferView(0, mObjectCB->Resource()->GetGPUVirtualAddress());
 
-        ID3D12DescriptorHeap* heap = batch.DiffuseTexture->GetDescriptorHeap();
+        ID3D12DescriptorHeap* heap = batch.SrvHeap.Get();
         cmdList->SetDescriptorHeaps(1, &heap);
-        cmdList->SetGraphicsRootDescriptorTable(1, batch.DiffuseTexture->GetSRV());
+        cmdList->SetGraphicsRootDescriptorTable(1, batch.SrvHeap->GetGPUDescriptorHandleForHeapStart());
 
         cmdList->DrawIndexedInstanced(batch.IndexCount, 1, batch.StartIndexLocation, 0, 0);
     }
+}
+
+std::shared_ptr<Texture> SponzaObject::LoadDisplacement(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, const std::string& albedoPath)
+{
+    if (albedoPath.empty())
+        return mFlatHeight;
+
+    auto found = mDisplacementCache.find(albedoPath);
+    if (found != mDisplacementCache.end())
+        return found->second;
+
+    std::vector<uint8_t> pixels;
+    UINT w = 0, h = 0;
+    if (!Texture::DecodeImageRGBA(albedoPath, pixels, w, h) || w == 0 || h == 0)
+    {
+        mDisplacementCache[albedoPath] = mFlatHeight;
+        return mFlatHeight;
+    }
+
+    for (size_t i = 0; i < pixels.size(); i += 4)
+    {
+        float lum = (pixels[i] * 0.299f + pixels[i + 1] * 0.587f + pixels[i + 2] * 0.114f) / 255.0f;
+        BYTE v = (BYTE)(lum * 255.0f);
+        pixels[i] = v;
+        pixels[i + 1] = v;
+        pixels[i + 2] = v;
+        pixels[i + 3] = 255;
+    }
+
+    auto tex = std::make_shared<Texture>();
+    if (!tex->CreateFromRGBA8(device, cmdList, w, h, pixels.data()))
+    {
+        mDisplacementCache[albedoPath] = mFlatHeight;
+        return mFlatHeight;
+    }
+
+    mDisplacementCache[albedoPath] = tex;
+    return tex;
+}
+
+bool SponzaObject::BuildBatchHeap(ID3D12Device* device, MaterialDrawBatch& batch)
+{
+    if (!batch.DiffuseTexture || !batch.NormalTexture || !batch.DisplacementTexture)
+        return false;
+
+    D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
+    heapDesc.NumDescriptors = 3;
+    heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+    heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+    ThrowIfFailed(device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&batch.SrvHeap)));
+
+    UINT inc = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    CD3DX12_CPU_DESCRIPTOR_HANDLE cpu(batch.SrvHeap->GetCPUDescriptorHandleForHeapStart());
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Texture2D.MipLevels = 1;
+
+    ID3D12Resource* maps[3] = {
+        batch.DiffuseTexture->GetResource(),
+        batch.NormalTexture->GetResource(),
+        batch.DisplacementTexture->GetResource()
+    };
+    for (int i = 0; i < 3; ++i)
+    {
+        srvDesc.Format = maps[i]->GetDesc().Format;
+        device->CreateShaderResourceView(maps[i], &srvDesc, cpu);
+        cpu.Offset(1, inc);
+    }
+    return true;
 }
 
 bool SponzaObject::LoadModel(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList)
@@ -117,13 +252,21 @@ bool SponzaObject::LoadModel(ID3D12Device* device, ID3D12GraphicsCommandList* cm
         return false;
     }
 
-    std::vector<std::pair<std::shared_ptr<Texture>, XMFLOAT4>> matTable;
+    struct MatMaps
+    {
+        std::shared_ptr<Texture> Diffuse;
+        std::shared_ptr<Texture> Normal;
+        std::shared_ptr<Texture> Displacement;
+        XMFLOAT4 Kd = { 1.0f, 1.0f, 1.0f, 1.0f };
+    };
+
+    std::vector<MatMaps> matTable;
     if (materials.empty())
     {
         auto white = mTextureManager->GetWhiteTexture();
         if (!white)
             return false;
-        matTable.push_back({ white, XMFLOAT4(0.75f, 0.75f, 0.75f, 1.0f) });
+        matTable.push_back({ white, mFlatNormal, mFlatHeight, XMFLOAT4(0.75f, 0.75f, 0.75f, 1.0f) });
     }
     else
     {
@@ -135,31 +278,33 @@ bool SponzaObject::LoadModel(ID3D12Device* device, ID3D12GraphicsCommandList* cm
                 (float)m.diffuse[2],
                 1.0f);
 
+            std::shared_ptr<Texture> diffuse = mTextureManager->GetWhiteTexture();
+            std::string albedoPath;
             if (!m.diffuse_texname.empty())
             {
-                std::string path = JoinUnderModels(modelsRoot, m.diffuse_texname);
-                auto tex = mTextureManager->LoadTexture(path);
+                albedoPath = JoinUnderModels(modelsRoot, m.diffuse_texname);
+                auto tex = mTextureManager->LoadTexture(albedoPath);
                 if (tex)
-                    matTable.push_back({ tex, kd });
-                else
-                {
-                    auto white = mTextureManager->GetWhiteTexture();
-                    if (!white)
-                        return false;
-                    matTable.push_back({ white, kd });
-                }
+                    diffuse = tex;
             }
-            else
+            if (!diffuse)
+                return false;
+
+            std::shared_ptr<Texture> normal = mFlatNormal;
+            std::string npath = ToNormalMapPath(albedoPath);
+            if (!npath.empty())
             {
-                auto white = mTextureManager->GetWhiteTexture();
-                if (!white)
-                    return false;
-                matTable.push_back({ white, kd });
+                auto ntex = mTextureManager->LoadTexture(npath);
+                if (ntex)
+                    normal = ntex;
             }
+
+            auto disp = LoadDisplacement(device, cmdList, albedoPath);
+            matTable.push_back({ diffuse, normal, disp, kd });
         }
     }
 
-    std::vector<ObjVertex> vertices;
+    std::vector<TessVertex> vertices;
     std::vector<uint32_t> indices;
     mMaterialBatches.clear();
 
@@ -179,9 +324,13 @@ bool SponzaObject::LoadModel(ID3D12Device* device, ID3D12GraphicsCommandList* cm
         MaterialDrawBatch batch;
         batch.StartIndexLocation = rangeStart;
         batch.IndexCount = rangeEnd - rangeStart;
-        batch.DiffuseTexture = matTable[mid].first;
-        batch.DiffuseFactor = matTable[mid].second;
-        mMaterialBatches.push_back(batch);
+        batch.DiffuseTexture = matTable[mid].Diffuse;
+        batch.NormalTexture = matTable[mid].Normal;
+        batch.DisplacementTexture = matTable[mid].Displacement;
+        batch.DiffuseFactor = matTable[mid].Kd;
+        if (!BuildBatchHeap(device, batch))
+            return;
+        mMaterialBatches.push_back(std::move(batch));
         rangeStart = rangeEnd;
     };
 
@@ -222,7 +371,7 @@ bool SponzaObject::LoadModel(ID3D12Device* device, ID3D12GraphicsCommandList* cm
                 float vy = attrib.vertices[3 * idx.vertex_index + 1];
                 float vz = attrib.vertices[3 * idx.vertex_index + 2];
 
-                float nx = 0.0f, ny = 0.0f, nz = 0.0f;
+                float nx = 0.0f, ny = 1.0f, nz = 0.0f;
                 if (idx.normal_index >= 0)
                 {
                     nx = attrib.normals[3 * idx.normal_index + 0];
@@ -237,9 +386,10 @@ bool SponzaObject::LoadModel(ID3D12Device* device, ID3D12GraphicsCommandList* cm
                     ty = attrib.texcoords[2 * idx.texcoord_index + 1];
                 }
 
-                ObjVertex vertex;
+                TessVertex vertex;
                 vertex.Pos = XMFLOAT3(vx, vy, vz);
                 vertex.Normal = XMFLOAT3(nx, ny, nz);
+                vertex.Tangent = XMFLOAT3(1.0f, 0.0f, 0.0f);
                 vertex.TexC = XMFLOAT2(tx, ty);
 
                 vertices.push_back(vertex);
@@ -257,7 +407,9 @@ bool SponzaObject::LoadModel(ID3D12Device* device, ID3D12GraphicsCommandList* cm
         return false;
     }
 
-    const UINT vbByteSize = static_cast<UINT>(vertices.size()) * sizeof(ObjVertex);
+    ComputeTangents(vertices, indices);
+
+    const UINT vbByteSize = static_cast<UINT>(vertices.size()) * sizeof(TessVertex);
     const UINT ibByteSize = static_cast<UINT>(indices.size()) * sizeof(uint32_t);
 
     mGeometry = std::make_unique<MeshGeometry>();
@@ -275,7 +427,7 @@ bool SponzaObject::LoadModel(ID3D12Device* device, ID3D12GraphicsCommandList* cm
     mGeometry->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(device,
         cmdList, indices.data(), ibByteSize, mGeometry->IndexBufferUploader);
 
-    mGeometry->VertexByteStride = sizeof(ObjVertex);
+    mGeometry->VertexByteStride = sizeof(TessVertex);
     mGeometry->VertexBufferByteSize = vbByteSize;
     mGeometry->IndexFormat = DXGI_FORMAT_R32_UINT;
     mGeometry->IndexBufferByteSize = ibByteSize;
@@ -284,7 +436,6 @@ bool SponzaObject::LoadModel(ID3D12Device* device, ID3D12GraphicsCommandList* cm
     submesh.IndexCount = static_cast<UINT>(indices.size());
     submesh.StartIndexLocation = 0;
     submesh.BaseVertexLocation = 0;
-
     mGeometry->DrawArgs["sponza"] = submesh;
 
     return true;

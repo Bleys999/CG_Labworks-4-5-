@@ -89,14 +89,21 @@ bool Texture::UploadTexture2D(ID3D12Device* device, ID3D12GraphicsCommandList* c
     UpdateSubresources(cmdList, mTexture.Get(), mUploadBuffer.Get(), 0, 0, 1, &textureData);
 
     cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mTexture.Get(),
-        D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+        D3D12_RESOURCE_STATE_COPY_DEST,
+        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE));
 
     CreateSRV(device);
 
     return true;
 }
 
-bool Texture::LoadFromFile(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, const std::string& filename)
+bool Texture::CreateFromRGBA8(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, UINT width, UINT height, const void* rgbaPixels)
+{
+    mFilename.clear();
+    return UploadTexture2D(device, cmdList, width, height, rgbaPixels);
+}
+
+bool Texture::DecodeImageRGBA(const std::string& filename, std::vector<uint8_t>& outRgba, UINT& width, UINT& height)
 {
     std::wstring wfilename(filename.begin(), filename.end());
 
@@ -108,9 +115,7 @@ bool Texture::LoadFromFile(ID3D12Device* device, ID3D12GraphicsCommandList* cmdL
         IID_PPV_ARGS(&wicFactory));
 
     if (FAILED(hr))
-    {
         return false;
-    }
 
     Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder;
     hr = wicFactory->CreateDecoderFromFilename(
@@ -121,25 +126,17 @@ bool Texture::LoadFromFile(ID3D12Device* device, ID3D12GraphicsCommandList* cmdL
         &decoder);
 
     if (FAILED(hr))
-    {
         return false;
-    }
 
     Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame;
     hr = decoder->GetFrame(0, &frame);
-
     if (FAILED(hr))
-    {
         return false;
-    }
 
     Microsoft::WRL::ComPtr<IWICFormatConverter> converter;
     hr = wicFactory->CreateFormatConverter(&converter);
-
     if (FAILED(hr))
-    {
         return false;
-    }
 
     hr = converter->Initialize(
         frame.Get(),
@@ -150,23 +147,24 @@ bool Texture::LoadFromFile(ID3D12Device* device, ID3D12GraphicsCommandList* cmdL
         WICBitmapPaletteTypeCustom);
 
     if (FAILED(hr))
-    {
         return false;
-    }
 
-    UINT width, height;
     converter->GetSize(&width, &height);
 
     UINT bufferSize = width * height * 4;
-    std::vector<BYTE> pixels(bufferSize);
+    outRgba.resize(bufferSize);
 
-    hr = converter->CopyPixels(nullptr, width * 4, bufferSize, pixels.data());
+    hr = converter->CopyPixels(nullptr, width * 4, bufferSize, outRgba.data());
+    return SUCCEEDED(hr);
+}
 
-    if (FAILED(hr))
-    {
+bool Texture::LoadFromFile(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, const std::string& filename)
+{
+    std::vector<BYTE> pixels;
+    UINT width = 0;
+    UINT height = 0;
+    if (!DecodeImageRGBA(filename, pixels, width, height))
         return false;
-    }
-
     return UploadTexture2D(device, cmdList, width, height, pixels.data());
 }
 

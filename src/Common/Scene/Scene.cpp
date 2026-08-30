@@ -85,6 +85,7 @@ void Scene::Update(const GameTimer& gt, const Camera& camera)
 
     for (auto& gameObject : mGameObjects)
     {
+        gameObject->SetFrameCamera(camera.GetPosition3f());
         gameObject->Update(gt);
         gameObject->UpdateConstantBuffer(view, proj);
     }
@@ -112,6 +113,8 @@ void Scene::Draw(ID3D12GraphicsCommandList* cmdList, const Camera& camera)
     {
         for (auto& gameObject : mGameObjects)
         {
+            if (gameObject->UsesTessellation())
+                continue;
             if (!gameObject->IsCullable() && gameObject->IsVisible())
             {
                 gameObject->Draw(cmdList);
@@ -123,7 +126,7 @@ void Scene::Draw(ID3D12GraphicsCommandList* cmdList, const Camera& camera)
         mOctree.Query(frustum, visible);
         for (GameObject* object : visible)
         {
-            if (!object->IsVisible())
+            if (!object->IsVisible() || object->UsesTessellation())
                 continue;
             object->Draw(cmdList);
             ++mDrawnCount;
@@ -133,8 +136,28 @@ void Scene::Draw(ID3D12GraphicsCommandList* cmdList, const Camera& camera)
 
     for (auto& gameObject : mGameObjects)
     {
+        if (gameObject->UsesTessellation())
+            continue;
         if (!ShouldDrawObject(gameObject.get(), frustum))
             continue;
+        gameObject->Draw(cmdList);
+        ++mDrawnCount;
+    }
+}
+
+void Scene::DrawTessellated(ID3D12GraphicsCommandList* cmdList, const Camera& camera)
+{
+    BoundingFrustum frustum = camera.GetWorldFrustum();
+
+    for (auto& gameObject : mGameObjects)
+    {
+        if (!gameObject->UsesTessellation() || !gameObject->IsVisible())
+            continue;
+        if (gameObject->IsCullable() && (mFrustumCulling || mOctreeCulling))
+        {
+            if (frustum.Contains(gameObject->GetWorldBounds()) == DISJOINT)
+                continue;
+        }
         gameObject->Draw(cmdList);
         ++mDrawnCount;
     }

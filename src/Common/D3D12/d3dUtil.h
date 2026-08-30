@@ -171,6 +171,14 @@ struct ObjVertex
     DirectX::XMFLOAT2 TexC;
 };
 
+struct TessVertex
+{
+    DirectX::XMFLOAT3 Pos;
+    DirectX::XMFLOAT3 Normal;
+    DirectX::XMFLOAT3 Tangent;
+    DirectX::XMFLOAT2 TexC;
+};
+
 struct ObjectConstants
 {
     DirectX::XMFLOAT4X4 WorldViewProj = MathHelper::Identity4x4();
@@ -178,6 +186,12 @@ struct ObjectConstants
     DirectX::XMFLOAT4 DiffuseFactor = { 1.0f, 1.0f, 1.0f, 1.0f };
     DirectX::XMFLOAT2 UVScale = { 1.0f, 1.0f };
     DirectX::XMFLOAT2 UVOffset = { 0.0f, 0.0f };
-    float Padding[24] = {};
+    DirectX::XMFLOAT3 CameraWorld = { 0.0f, 0.0f, 0.0f };
+    float DisplacementScale = 0.0f;
+    float TessMin = 1.0f;
+    float TessMax = 1.0f;
+    float TessNear = 1.0f;
+    float TessFar = 1.0f;
+    float Padding[16] = {};
 };
 static_assert(sizeof(ObjectConstants) == 256, "ObjectConstants must be 256 bytes");

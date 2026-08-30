@@ -35,6 +35,9 @@
     <Filter Include="Main\Objects\Box">
       <UniqueIdentifier>{a1b2c3d4-0006-0000-0000-000000000001}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Main\Objects\Tess">
+      <UniqueIdentifier>{a1b2c3d4-0008-0000-0000-000000000001}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Common\Rendering">
       <UniqueIdentifier>{a1b2c3d4-0007-0000-0000-000000000001}</UniqueIdentifier>
     </Filter>
@@ -45,6 +48,9 @@
     </ClCompile>
     <ClCompile Include="Objects\Box\BoxObject.cpp">
       <Filter>Main\Objects\Box</Filter>
+    </ClCompile>
+    <ClCompile Include="Objects\Tess\TessellatedObject.cpp">
+      <Filter>Main\Objects\Tess</Filter>
     </ClCompile>
     <ClCompile Include="..\Common\Core\d3dApp.cpp">
       <Filter>Common\Core</Filter>
@@ -98,6 +104,9 @@
   <ItemGroup>
     <ClInclude Include="Objects\Box\BoxObject.h">
       <Filter>Main\Objects\Box</Filter>
+    </ClInclude>
+    <ClInclude Include="Objects\Tess\TessellatedObject.h">
+      <Filter>Main\Objects\Tess</Filter>
     </ClInclude>
     <ClInclude Include="..\Common\Core\Config.h">
       <Filter>Common\Core</Filter>
@@ -159,6 +168,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Debug\Shaders\texture.hlsl">
+      <Filter>Shader Files</Filter>
+    </None>
+    <None Include="Debug\Shaders\tessellation.hlsl">
       <Filter>Shader Files</Filter>
     </None>
     <None Include="Debug\Shaders\gbuffer.hlsl">

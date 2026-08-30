@@ -36,6 +36,9 @@ public:
     void ApplyGeometryPass(ID3D12GraphicsCommandList* cmdList) const;
     ID3D12PipelineState* GetGeometryPSO() const { return mGeometryPSO.Get(); }
 
+    void ApplyTessellationPass(ID3D12GraphicsCommandList* cmdList) const;
+    ID3D12PipelineState* GetTessellationPSO() const { return mTessellationPSO.Get(); }
+
     void UpdateLightingConstants(const Camera& camera);
     void DrawDeferredLighting(
         ID3D12GraphicsCommandList* cmdList,
@@ -45,6 +48,7 @@ public:
 
 private:
     void BuildGeometryPass(ID3D12Device* device);
+    void BuildTessellationPass(ID3D12Device* device);
     void BuildLightingPass(ID3D12Device* device);
     void InitDefaultLights();
 
@@ -56,6 +60,14 @@ private:
     Microsoft::WRL::ComPtr<ID3DBlob> mGeometryVs;
     Microsoft::WRL::ComPtr<ID3DBlob> mGeometryPs;
     std::vector<D3D12_INPUT_ELEMENT_DESC> mGeometryInputLayout;
+
+    Microsoft::WRL::ComPtr<ID3D12RootSignature> mTessellationRootSignature;
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> mTessellationPSO;
+    Microsoft::WRL::ComPtr<ID3DBlob> mTessVs;
+    Microsoft::WRL::ComPtr<ID3DBlob> mTessHs;
+    Microsoft::WRL::ComPtr<ID3DBlob> mTessDs;
+    Microsoft::WRL::ComPtr<ID3DBlob> mTessPs;
+    std::vector<D3D12_INPUT_ELEMENT_DESC> mTessellationInputLayout;
 
     Microsoft::WRL::ComPtr<ID3D12RootSignature> mLightingRootSignature;
     Microsoft::WRL::ComPtr<ID3D12PipelineState> mLightingPSO;

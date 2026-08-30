@@ -20,6 +20,7 @@ bool RenderingSystem::Initialize(ID3D12Device* device)
     mLightingCB = std::make_unique<UploadBuffer<DeferredLightingConstants>>(device, 1, true);
     InitDefaultLights();
     BuildGeometryPass(device);
+    BuildTessellationPass(device);
     BuildLightingPass(device);
     return true;
 }
@@ -68,6 +69,12 @@ void RenderingSystem::UpdateLightingConstants(const Camera& camera)
 void RenderingSystem::ApplyGeometryPass(ID3D12GraphicsCommandList* cmdList) const
 {
     cmdList->SetGraphicsRootSignature(mGeometryRootSignature.Get());
+}
+
+void RenderingSystem::ApplyTessellationPass(ID3D12GraphicsCommandList* cmdList) const
+{
+    cmdList->SetGraphicsRootSignature(mTessellationRootSignature.Get());
+    cmdList->SetPipelineState(mTessellationPSO.Get());
 }
 
 void RenderingSystem::DrawDeferredLighting(
@@ -173,6 +180,90 @@ void RenderingSystem::BuildGeometryPass(ID3D12Device* device)
     psoDesc.SampleDesc.Quality = 0;
 
     ThrowIfFailed(device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&mGeometryPSO)));
+}
+
+void RenderingSystem::BuildTessellationPass(ID3D12Device* device)
+{
+    ComPtr<ID3DBlob> errors;
+
+    auto Compile = [&](const char* entry, const char* target, ComPtr<ID3DBlob>& out)
+    {
+        errors.Reset();
+        HRESULT hr = D3DCompileFromFile(L"Shaders\\tessellation.hlsl", nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE,
+            entry, target, CompileFlags(), 0, &out, &errors);
+        if (FAILED(hr))
+        {
+            if (errors)
+                OutputDebugStringA((char*)errors->GetBufferPointer());
+            ThrowIfFailed(hr);
+        }
+    };
+
+    Compile("VS", "vs_5_0", mTessVs);
+    Compile("HS", "hs_5_0", mTessHs);
+    Compile("DS", "ds_5_0", mTessDs);
+    Compile("PS", "ps_5_0", mTessPs);
+
+    CD3DX12_DESCRIPTOR_RANGE srvRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 3, 0);
+
+    CD3DX12_ROOT_PARAMETER slotRootParameter[2];
+    slotRootParameter[0].InitAsConstantBufferView(0);
+    slotRootParameter[1].InitAsDescriptorTable(1, &srvRange);
+
+    CD3DX12_STATIC_SAMPLER_DESC samplerDesc(
+        0,
+        D3D12_FILTER_MIN_MAG_MIP_LINEAR,
+        D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+        D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+        D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+        0.0f,
+        1,
+        D3D12_COMPARISON_FUNC_ALWAYS,
+        D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE,
+        0.0f,
+        D3D12_FLOAT32_MAX,
+        D3D12_SHADER_VISIBILITY_ALL,
+        0);
+
+    CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(2, slotRootParameter, 1, &samplerDesc,
+        D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+    ComPtr<ID3DBlob> serializedRootSig;
+    ComPtr<ID3DBlob> errorBlob;
+    ThrowIfFailed(D3D12SerializeRootSignature(&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1,
+        serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf()));
+    ThrowIfFailed(device->CreateRootSignature(0, serializedRootSig->GetBufferPointer(),
+        serializedRootSig->GetBufferSize(), IID_PPV_ARGS(&mTessellationRootSignature)));
+
+    mTessellationInputLayout =
+    {
+        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 36, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    };
+
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+    psoDesc.InputLayout = { mTessellationInputLayout.data(), (UINT)mTessellationInputLayout.size() };
+    psoDesc.pRootSignature = mTessellationRootSignature.Get();
+    psoDesc.VS = { reinterpret_cast<BYTE*>(mTessVs->GetBufferPointer()), mTessVs->GetBufferSize() };
+    psoDesc.HS = { reinterpret_cast<BYTE*>(mTessHs->GetBufferPointer()), mTessHs->GetBufferSize() };
+    psoDesc.DS = { reinterpret_cast<BYTE*>(mTessDs->GetBufferPointer()), mTessDs->GetBufferSize() };
+    psoDesc.PS = { reinterpret_cast<BYTE*>(mTessPs->GetBufferPointer()), mTessPs->GetBufferSize() };
+    psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+    psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+    psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+    psoDesc.SampleMask = UINT_MAX;
+    psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH;
+    psoDesc.NumRenderTargets = GBuffer::ColorTargetCount;
+    psoDesc.RTVFormats[0] = GBuffer::AlbedoFormat;
+    psoDesc.RTVFormats[1] = GBuffer::NormalFormat;
+    psoDesc.RTVFormats[2] = GBuffer::WorldPosFormat;
+    psoDesc.DSVFormat = GBuffer::DepthFormat;
+    psoDesc.SampleDesc.Count = 1;
+    psoDesc.SampleDesc.Quality = 0;
+
+    ThrowIfFailed(device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&mTessellationPSO)));
 }
 
 void RenderingSystem::BuildLightingPass(ID3D12Device* device)

@@ -164,6 +164,7 @@
     <ClCompile Include="Objects\Sponza\SponzaObject.cpp" />
     <ClCompile Include="MainApp.cpp" />
     <ClCompile Include="Objects\Box\BoxObject.cpp" />
+    <ClCompile Include="Objects\Tess\TessellatedObject.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Common\Scene\Camera.h" />
@@ -186,6 +187,7 @@
     <ClInclude Include="..\Common\D3D12\d3dx12.h" />
     <ClInclude Include="Objects\Sponza\SponzaObject.h" />
     <ClInclude Include="Objects\Box\BoxObject.h" />
+    <ClInclude Include="Objects\Tess\TessellatedObject.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -111,6 +111,9 @@ void MainApp::Draw(const GameTimer& gt)
 
     mRendering.ApplyGeometryPass(mCommandList.Get());
     mScene.Draw(mCommandList.Get(), mCamera);
+
+    mRendering.ApplyTessellationPass(mCommandList.Get());
+    mScene.DrawTessellated(mCommandList.Get(), mCamera);
     RefreshWindowCaption();
 
     gbuffer.EndGeometryPass(mCommandList.Get());
